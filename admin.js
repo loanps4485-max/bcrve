@@ -1,5 +1,5 @@
 const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}
-const headers=()=>({"X-Telegram-Init-Data":tg?.initData||""});
+const headers=()=>({"X-Telegram-Init-Data":tg?.initData||sessionStorage.getItem("bcrve_telegram_init_data")||""});
 const euro=n=>Number(n).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
 async function api(url,opt={}){opt.headers={...(opt.headers||{}),...headers(),"content-type":"application/json"};const r=await fetch(url,opt);const d=await r.json();if(!r.ok)throw new Error(d.error||"Erreur");return d}
 async function load(){
