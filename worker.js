@@ -125,6 +125,11 @@ async function requireAdmin(request, env) {
 }
 
 async function handleApi(request, env, url) {
+  const isAdminPath = url.pathname === "/api/admin" || url.pathname.startsWith("/api/admin/");
+  if (isAdminPath) {
+    const admin = await requireAdmin(request, env);
+    if (admin instanceof Response) return admin;
+  }
   if (!env.DB) return json({error:"D1 non configurée."}, 503);
 
   if (url.pathname === "/api/products" && request.method === "GET") {
@@ -188,14 +193,10 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/check" && request.method === "GET") {
-    const admin = await requireAdmin(request, env);
-    if (admin instanceof Response) return admin;
     return json({ok:true});
   }
 
   if (url.pathname === "/api/admin/orders" && request.method === "GET") {
-    const admin = await requireAdmin(request, env);
-    if (admin instanceof Response) return admin;
     const { results } = await env.DB.prepare(`
       SELECT o.id,o.telegram_user_id,o.telegram_name,o.total,o.payment,o.status,o.created_at,
              COALESCE(GROUP_CONCAT(oi.name || ' × ' || oi.qty, ' | '),'') items
@@ -206,8 +207,6 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/orders/status" && request.method === "POST") {
-    const admin = await requireAdmin(request, env);
-    if (admin instanceof Response) return admin;
     const body = await request.json();
     const allowed = ["new","preparing","ready","delivered","cancelled"];
     if (!allowed.includes(body.status)) return json({error:"Statut invalide."},400);
@@ -216,8 +215,6 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/products" && request.method === "GET") {
-    const admin = await requireAdmin(request, env);
-    if (admin instanceof Response) return admin;
     const { results } = await env.DB.prepare(
       "SELECT id,name,sub,price,cat,active,sort_order FROM products ORDER BY sort_order,id"
     ).all();
@@ -225,8 +222,6 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/products" && request.method === "POST") {
-    const admin = await requireAdmin(request, env);
-    if (admin instanceof Response) return admin;
     const b = await request.json();
     if (!b.name || !Number.isFinite(Number(b.price)) || Number(b.price) < 0) return json({error:"Nom/prix requis."},400);
     await env.DB.prepare(
@@ -236,8 +231,6 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/products" && request.method === "PUT") {
-    const admin = await requireAdmin(request, env);
-    if (admin instanceof Response) return admin;
     const b = await request.json();
     if (!b.name || !Number.isFinite(Number(b.price)) || Number(b.price) < 0) return json({error:"Nom/prix requis."},400);
     await env.DB.prepare(

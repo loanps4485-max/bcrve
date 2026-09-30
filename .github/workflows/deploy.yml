@@ -158,7 +158,7 @@ jobs:
             return new URLSearchParams({ ...fields, hash }).toString();
           }
 
-          async function expectStatus(path, expected, { userId, body, method } = {}) {
+          async function expectStatus(path, expected, { userId, body, method, noDatabase } = {}) {
             const headers = {};
             if (userId !== undefined) headers["X-Telegram-Init-Data"] = signedInitData(userId);
             if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -167,7 +167,9 @@ jobs:
               headers,
               body: body === undefined ? undefined : JSON.stringify(body),
             });
-            const response = await worker.fetch(request, { BOT_TOKEN: token, DB: {} });
+            const env = { BOT_TOKEN: token };
+            if (!noDatabase) env.DB = {};
+            const response = await worker.fetch(request, env);
             const message = await response.text();
             assert.equal(response.status, expected, path + " returned " + response.status + ": " + message);
           }
@@ -182,11 +184,17 @@ jobs:
             { path: "/api/admin/products", method: "GET" },
             { path: "/api/admin/products", method: "POST", body: { name: "Blocked", price: 1 } },
             { path: "/api/admin/products", method: "PUT", body: { id: 1, name: "Blocked", price: 1 } },
+            { path: "/api/admin", method: "GET" },
+            { path: "/api/admin/not-a-route", method: "DELETE" },
           ];
           for (const route of adminRoutes) {
             await expectStatus(route.path, 401, route);
             await expectStatus(route.path, 403, { ...route, userId: 1111111111 });
           }
+          await expectStatus("/api/admin", 404, { userId: 6898182858 });
+          await expectStatus("/api/admin/not-a-route", 404, { userId: 6898182858 });
+          await expectStatus("/api/admin/not-a-route", 401, { noDatabase: true });
+          await expectStatus("/api/admin/not-a-route", 403, { userId: 1111111111, noDatabase: true });
 
           await expectStatus("/api/orders", 400, { userId: 6898182858, body: { items: [] } });
 
