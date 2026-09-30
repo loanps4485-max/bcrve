@@ -3,9 +3,8 @@ main = "worker.js"
 compatibility_date = "2026-09-30"
 
 [assets]
-directory = "."
+directory = "public"
 binding = "ASSETS"
-exclude = ["node_modules/**", ".git/**", ".wrangler/**"]
 
 [[d1_databases]]
 binding = "DB"
