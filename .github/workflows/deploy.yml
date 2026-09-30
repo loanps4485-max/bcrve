@@ -29,4 +29,4 @@ jobs:
           command: deploy worker.js --name bcrve --var "BOT_TOKEN:${BOT_TOKEN}"
 
       - name: Deployment triggered
-        run: echo "BCRVE deployment completed"
+        run: echo "BCRVE deployment check: $GITHUB_SHA"
