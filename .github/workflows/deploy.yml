@@ -9,7 +9,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # manual retry trigger
     permissions:
       contents: read
     steps:
@@ -21,19 +20,11 @@ jobs:
           mkdir -p public
           cp index.html admin.html app.js admin.js styles.css admin.css public/
 
-      - name: Prepare secret file
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        run: |
-          printf 'BOT_TOKEN=%s\n' "$BOT_TOKEN" > .secrets
-
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --secrets-file .secrets
-
-      - name: Remove secret file
-        if: always()
-        run: rm -f .secrets
+          command: deploy --var "BOT_TOKEN:${BOT_TOKEN}"
