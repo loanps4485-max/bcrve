@@ -1,31 +1,7 @@
-# BCRVE85 V3
+# Anciennes notes V3
 
-V3 = Mini App + Cloudflare Worker + Cloudflare D1 + Telegram.
+Les instructions de ce fichier sont archivées. La boutique est maintenant déployée sur Cloudflare et gérée par GitHub Actions.
 
-## 1. Créer la base D1
-Dans Cloudflare Dashboard → Workers & Pages → D1 → Create database.
-Nom : `bcrve-db`.
-Copier le Database ID.
+Pour la configuration actuelle, les secrets, l’authentification Telegram et l’administration, consulte [README.md](README.md).
 
-Dans `wrangler.jsonc`, remplacer :
-`A_REMPLACER_PAR_LE_DATABASE_ID_CLOUDFLARE`
-par le Database ID.
-
-## 2. Initialiser la base
-Dans Cloudflare D1, ouvrir la console SQL et exécuter tout le contenu de `schema.sql`.
-
-## 3. Secrets Cloudflare
-Ajouter dans le Worker :
-- `BOT_TOKEN` = token du bot Telegram
-- `ADMIN_IDS` = identifiant Telegram du/des administrateurs, séparés par des virgules
-
-Ne jamais mettre ces valeurs dans GitHub.
-
-## 4. Déploiement
-Le Worker utilise `worker.js` et les fichiers statiques du dépôt.
-
-## 5. Admin
-Ouvrir `https://TON-DOMAINE/admin.html` depuis Telegram avec un compte présent dans `ADMIN_IDS`.
-
-## Important
-La V3 valide `Telegram.WebApp.initData` côté serveur avant de créer une commande.
+À retenir : ne configure pas `ADMIN_IDS` dans Cloudflare. Les seules valeurs autorisées sont fixées dans `worker.js`, et les routes `/api/admin/*` les vérifient côté serveur. Ne colle jamais de token dans Git ou dans une variable Worker en clair.

@@ -1,15 +1,33 @@
-# BCRVE85 V2
+# BCRVE85 — boutique Telegram
 
-V2 du prototype Telegram Mini App.
+Boutique mobile, catalogue et commandes gérés par un Cloudflare Worker et une base D1.
 
-## Paiement
-Aucun paiement en ligne. Toutes les commandes utilisent `payment: "cash"` et sont prévues pour une remise en main propre.
+- **Boutique publique :** https://bcrve.loanps4485.workers.dev
+- **Mini App :** ouvre la boutique depuis le bot Telegram [@Bcrvee85_bot](https://t.me/Bcrvee85_bot).
+- Le lien public permet de consulter le catalogue. Les commandes et l’administration nécessitent une session Mini App Telegram valide.
 
-## Flux
-Produit → Panier → Confirmation → commande Telegram → préparation → remise → espèces.
+## Parcours client
 
-## Important
-Le dossier contient le front-end/prototype. Pour la mise en production, il faut connecter le bot à un backend sécurisé et une base de données. Le `sendData` Telegram ne doit pas être considéré comme une preuve d'identité côté serveur sans validation de `initData`.
+Catalogue → panier → confirmation dans Telegram → préparation → remise en main propre, paiement en espèces.
 
-## Admin
-`admin.html` est une maquette mobile de l'espace administrateur. En production, elle devra être protégée et reliée à la base.
+Le serveur recalcule le total depuis les prix du catalogue. Il vérifie `Telegram.WebApp.initData` avant d’enregistrer une commande.
+
+## Administration
+
+La page `admin.html` gère les commandes et le catalogue. Le raccourci Admin s’affiche après confirmation du Worker.
+
+Toutes les routes `/api/admin/*` vérifient la session Telegram **côté serveur**. Seuls les IDs Telegram `6898182858` et `5379947962` sont autorisés. Cette liste est fixée dans `worker.js`; il n’y a pas de variable `ADMIN_IDS` à configurer.
+
+## Déploiement et secrets
+
+Un push sur `main` lance le workflow [Deploy to Cloudflare](.github/workflows/deploy.yml). Il publie le Worker et les fichiers de la boutique.
+
+Le dépôt GitHub doit contenir ces secrets d’Actions :
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `BOT_TOKEN`
+
+Le workflow valide le bot, retire l’ancienne variable en clair si elle existe, puis installe `BOT_TOKEN` comme secret Worker chiffré. **Ne place jamais de token dans le dépôt, dans `wrangler.toml` ou dans une variable Worker en clair.**
+
+La configuration D1 existante se trouve dans `wrangler.toml`. `schema.sql` sert uniquement à initialiser une nouvelle base ; ne le rejoue pas sur la base de production.
