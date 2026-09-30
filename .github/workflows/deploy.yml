@@ -30,6 +30,7 @@ jobs:
           import json
           import os
           import sys
+          import urllib.error
           import urllib.parse
           import urllib.request
 
@@ -45,10 +46,17 @@ jobs:
               try:
                   with urllib.request.urlopen(url, timeout=15) as response:
                       payload = json.load(response)
+              except urllib.error.HTTPError as error:
+                  try:
+                      payload = json.load(error)
+                  except Exception:
+                      if required:
+                          raise SystemExit(f"Telegram {method} check failed (HTTP {error.code}); token was not printed.")
+                      return {"_api_error": "HTTP " + str(error.code)}
               except Exception as error:
                   if required:
                       raise SystemExit(f"Telegram {method} check failed ({type(error).__name__}); token was not printed.")
-                  return {"_api_error": "HTTP transport unavailable"}
+                  return {"_api_error": "network unavailable"}
               if not payload.get("ok"):
                   if required:
                       raise SystemExit(f"Telegram {method} check failed (HTTP {payload.get('error_code', 'unknown')}); token was not printed.")
