@@ -21,4 +21,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy worker.js
 
-# deploy trigger
+# deploy trigger after secrets setup
