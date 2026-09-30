@@ -82,12 +82,22 @@ async function verifyTelegramInitData(initData, botToken, maxAge = 86400) {
 
 async function telegramSend(env, chatId, text) {
   const botToken = String(env.BOT_TOKEN || "").trim();
-  if (!botToken || !chatId) return;
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: {"content-type":"application/json"},
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
-  });
+  if (!botToken || !chatId) return false;
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: {"content-type":"application/json"},
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
+    });
+    let result = null;
+    try { result = await response.json(); } catch {}
+    const delivered = response.ok && result?.ok === true;
+    if (!delivered) console.warn(`Telegram order notification was not delivered (HTTP ${response.status}).`);
+    return delivered;
+  } catch {
+    console.warn("Telegram order notification request failed.");
+    return false;
+  }
 }
 
 const ADMIN_IDS = new Set(["6898182858", "5379947962"]);
@@ -170,9 +180,11 @@ async function handleApi(request, env, url) {
     const lines = clean.map(x => `• ${htmlEscape(x.name)} × ${x.qty}`).join("\n");
     const client = [user.first_name,user.last_name].filter(Boolean).join(" ") || user.username || `ID ${user.id}`;
     const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${htmlEscape(client)}\n<b>ID Telegram :</b> <code>${htmlEscape(user.id)}</code>\n\n${lines}\n\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
-    for (const id of adminIds()) await telegramSend(env,id,msg);
+    const notificationsDelivered = (await Promise.all(
+      [...adminIds()].map(id => telegramSend(env,id,msg))
+    )).filter(Boolean).length;
 
-    return json({ok:true,order_id:orderId,total});
+    return json({ok:true,order_id:orderId,total,notifications_delivered:notificationsDelivered});
   }
 
   if (url.pathname === "/api/admin/check" && request.method === "GET") {

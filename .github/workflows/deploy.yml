@@ -151,6 +151,82 @@ jobs:
           await expectStatus("/api/orders", 400, { userId: 6898182858, body: { items: [] } });
 
           console.log("Telegram auth passed for both admins; other and unauthenticated accounts were denied; no order was created.");
+
+          function fakeDatabase() {
+            const counts = { orders: 0, items: 0 };
+            const DB = {
+              prepare(sql) {
+                return {
+                  bind(...bindings) {
+                    return {
+                      async all() {
+                        if (sql.startsWith("SELECT id,name,price FROM products")) {
+                          return { results: [{ id: 7, name: "Synthetic product", price: 12.5 }] };
+                        }
+                        throw new Error("Unexpected synthetic query.");
+                      },
+                      async run() {
+                        if (sql.startsWith("INSERT INTO orders")) {
+                          counts.orders += 1;
+                          return { meta: { last_row_id: 5001 } };
+                        }
+                        return { meta: { changes: 1 } };
+                      },
+                    };
+                  },
+                };
+              },
+              async batch(statements) {
+                counts.items += statements.length;
+                return statements.map(() => ({ success: true }));
+              },
+            };
+            return { DB, counts };
+          }
+
+          async function submitSyntheticOrder(DB) {
+            const request = new Request("https://bcrve.test/api/orders", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "X-Telegram-Init-Data": signedInitData(424242),
+              },
+              body: JSON.stringify({ items: [{ id: 7, qty: 2 }] }),
+            });
+            return await worker.fetch(request, { BOT_TOKEN: token, DB });
+          }
+
+          const originalFetch = globalThis.fetch;
+          try {
+            let successfulNotifications = 0;
+            globalThis.fetch = async () => {
+              successfulNotifications += 1;
+              return new Response(JSON.stringify({ ok: true }), { status: 200 });
+            };
+            const successFixture = fakeDatabase();
+            const successResponse = await submitSyntheticOrder(successFixture.DB);
+            const successData = await successResponse.json();
+            assert.equal(successResponse.status, 200);
+            assert.equal(successData.notifications_delivered, 2);
+            assert.equal(successFixture.counts.orders, 1);
+            assert.equal(successFixture.counts.items, 1);
+            assert.equal(successfulNotifications, 2);
+
+            globalThis.fetch = async () => {
+              throw new Error("synthetic network failure");
+            };
+            const failureFixture = fakeDatabase();
+            const failureResponse = await submitSyntheticOrder(failureFixture.DB);
+            const failureData = await failureResponse.json();
+            assert.equal(failureResponse.status, 200);
+            assert.equal(failureData.notifications_delivered, 0);
+            assert.equal(failureFixture.counts.orders, 1);
+            assert.equal(failureFixture.counts.items, 1);
+          } finally {
+            globalThis.fetch = originalFetch;
+          }
+
+          console.log("Synthetic order persistence passed; notification success and failure were handled without a real order.");
           JS
 
       - name: Verify authorization against the deployed Worker
