@@ -73,7 +73,7 @@ jobs:
                       separators=(",", ":"),
                   ),
               }
-              check_string = "\\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
+              check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
               secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
               signature = hmac.new(secret_key, check_string.encode(), hashlib.sha256).hexdigest()
               return urllib.parse.urlencode({**fields, "hash": signature})
