@@ -35,6 +35,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --var "BOT_TOKEN:${BOT_TOKEN}"
+          secrets: |
+            BOT_TOKEN
+          command: deploy
 
 # redeploy
