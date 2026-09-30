@@ -70,7 +70,7 @@ async function telegramSend(env, chatId, text) {
 }
 
 function adminIds(env) {
-  return String(env.ADMIN_IDS || "")
+  return String(env.ADMIN_IDS || "6898182858,5379947962")
     .split(",").map(x => x.trim()).filter(Boolean);
 }
 
