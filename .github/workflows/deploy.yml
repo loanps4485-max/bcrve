@@ -358,6 +358,17 @@ jobs:
           if status != 403:
               raise SystemExit("The deployed Worker did not reject a signed non-admin account.")
 
+          for admin_path in ("/api/admin", "/api/admin/not-a-route"):
+              status, _ = request_status(admin_path, method="DELETE")
+              if status != 401:
+                  raise SystemExit("An unauthenticated unknown admin path was not rejected.")
+              status, _ = request_status(admin_path, signed_init_data(1111111111), method="DELETE")
+              if status != 403:
+                  raise SystemExit("A signed non-admin reached an unknown admin path.")
+              status, _ = request_status(admin_path, signed_init_data(6898182858), method="DELETE")
+              if status != 404:
+                  raise SystemExit("An authorized unknown admin path did not return 404.")
+
           status, _ = request_status("/api/admin/orders")
           if status != 401:
               raise SystemExit("The deployed Worker did not reject an unauthenticated admin request.")
@@ -395,6 +406,6 @@ jobs:
           if status != 400 or "Produit indisponible" not in body:
               raise SystemExit("The deployed order route did not reach the D1 product lookup.")
 
-          print("Live Cloudflare auth passed for both admins; unauthorized, expired, and tampered sessions were rejected. A valid order session reached D1 product lookup; no order was created.")
+          print("Live Cloudflare auth passed for both admins; unauthorized, expired, tampered, and unknown admin paths were rejected. A valid order session reached D1 product lookup; no order was created.")
           PY
 # redeploy
