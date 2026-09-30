@@ -18,18 +18,32 @@ function parseInitData(initData) {
 }
 
 async function verifyTelegramInitData(initData, botToken, maxAge = 86400) {
-  if (!initData || !botToken) return null;
+  const fail = (message, status = 401) => ({ user: null, error: { message, status } });
+  if (!initData) return fail("Session Telegram absente. Ouvre la Mini App depuis le bot.");
+  botToken = String(botToken || "").trim();
+  if (!botToken) return fail("Authentification serveur non configurée.", 503);
+
   const params = new URLSearchParams(initData);
   const hash = params.get("hash");
-  if (!hash) return null;
+  if (!hash || !/^[a-f0-9]{64}$/i.test(hash)) return fail("Signature Telegram absente ou invalide.");
 
+  const now = Math.floor(Date.now() / 1000);
   const authDate = Number(params.get("auth_date") || 0);
-  if (!authDate || Math.floor(Date.now()/1000) - authDate > maxAge) return null;
+  if (!Number.isInteger(authDate) || authDate <= 0) return fail("Date de session Telegram invalide.");
+  const age = now - authDate;
+  if (age > maxAge) return fail("Session Telegram expirée. Ferme puis rouvre la Mini App.");
+  if (age < -300) return fail("Date de session Telegram invalide.");
+
+  const userRaw = params.get("user");
+  if (!userRaw) return fail("Identité Telegram absente de la session.");
+  let user;
+  try { user = JSON.parse(userRaw); } catch { return fail("Identité Telegram illisible."); }
+  if (!user?.id) return fail("Identité Telegram invalide.");
 
   params.delete("hash");
   const dataCheckString = [...params.entries()]
-    .sort(([a],[b]) => a.localeCompare(b))
-    .map(([k,v]) => `${k}=${v}`)
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([k, v]) => `${k}=${v}`)
     .join("\n");
 
   const secretKey = await crypto.subtle.importKey(
@@ -44,25 +58,32 @@ async function verifyTelegramInitData(initData, botToken, maxAge = 86400) {
     secretKey,
     new TextEncoder().encode(botToken)
   );
-  const secretBytes = new Uint8Array(secret);
-
   const key = await crypto.subtle.importKey(
-    "raw", secretBytes,
+    "raw", new Uint8Array(secret),
     { name: "HMAC", hash: "SHA-256" },
     false, ["sign"]
   );
   const signature = await crypto.subtle.sign(
     "HMAC", key, new TextEncoder().encode(dataCheckString)
   );
-
-  const actual = [...new Uint8Array(signature)].map(b => b.toString(16).padStart(2,"0")).join("");
-  if (actual !== hash) return null;
-  return parseInitData(initData);
+  const actual = [...new Uint8Array(signature)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+  const expected = hash.toLowerCase();
+  let difference = actual.length ^ expected.length;
+  for (let i = 0; i < Math.min(actual.length, expected.length); i++) {
+    difference |= actual.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  if (difference !== 0) {
+    return fail("Signature Telegram refusée. La Mini App et le BOT_TOKEN doivent correspondre.");
+  }
+  return { user, error: null };
 }
 
 async function telegramSend(env, chatId, text) {
-  if (!env.BOT_TOKEN || !chatId) return;
-  await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+  const botToken = String(env.BOT_TOKEN || "").trim();
+  if (!botToken || !chatId) return;
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: {"content-type":"application/json"},
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
@@ -75,15 +96,22 @@ function adminIds() {
   return ADMIN_IDS;
 }
 
-async function requireUser(request, env) {
+async function authenticateRequest(request, env) {
   const initData = request.headers.get("X-Telegram-Init-Data") || "";
   return await verifyTelegramInitData(initData, env.BOT_TOKEN);
 }
 
+async function requireUser(request, env) {
+  return (await authenticateRequest(request, env)).user;
+}
+
 async function requireAdmin(request, env) {
-  const user = await requireUser(request, env);
-  if (!user?.id || !adminIds().has(String(user.id))) return null;
-  return user;
+  const auth = await authenticateRequest(request, env);
+  if (!auth.user) return json({error:auth.error.message}, auth.error.status);
+  if (!adminIds().has(String(auth.user.id))) {
+    return json({error:`Compte Telegram ${auth.user.id} non autorisé. Seuls les deux administrateurs configurés peuvent gérer les commandes.`},403);
+  }
+  return auth.user;
 }
 
 async function handleApi(request, env, url) {
@@ -97,8 +125,9 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/orders" && request.method === "POST") {
-    const user = await requireUser(request, env);
-    if (!user) return json({error:"Session Telegram invalide."}, 401);
+    const auth = await authenticateRequest(request, env);
+    const user = auth.user;
+    if (!user) return json({error:auth.error.message}, auth.error.status);
 
     let body;
     try { body = await request.json(); } catch { return json({error:"JSON invalide."},400); }
@@ -148,13 +177,13 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/admin/check" && request.method === "GET") {
     const admin = await requireAdmin(request, env);
-    if (!admin) return json({error:"Accès refusé."},403);
+    if (admin instanceof Response) return admin;
     return json({ok:true});
   }
 
   if (url.pathname === "/api/admin/orders" && request.method === "GET") {
     const admin = await requireAdmin(request, env);
-    if (!admin) return json({error:"Accès refusé."},403);
+    if (admin instanceof Response) return admin;
     const { results } = await env.DB.prepare(`
       SELECT o.id,o.telegram_user_id,o.telegram_name,o.total,o.payment,o.status,o.created_at,
              COALESCE(GROUP_CONCAT(oi.name || ' × ' || oi.qty, ' | '),'') items
@@ -166,7 +195,7 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/admin/orders/status" && request.method === "POST") {
     const admin = await requireAdmin(request, env);
-    if (!admin) return json({error:"Accès refusé."},403);
+    if (admin instanceof Response) return admin;
     const body = await request.json();
     const allowed = ["new","preparing","ready","delivered","cancelled"];
     if (!allowed.includes(body.status)) return json({error:"Statut invalide."},400);
@@ -176,7 +205,7 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/admin/products" && request.method === "GET") {
     const admin = await requireAdmin(request, env);
-    if (!admin) return json({error:"Accès refusé."},403);
+    if (admin instanceof Response) return admin;
     const { results } = await env.DB.prepare(
       "SELECT id,name,sub,price,cat,active,sort_order FROM products ORDER BY sort_order,id"
     ).all();
@@ -185,7 +214,7 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/admin/products" && request.method === "POST") {
     const admin = await requireAdmin(request, env);
-    if (!admin) return json({error:"Accès refusé."},403);
+    if (admin instanceof Response) return admin;
     const b = await request.json();
     if (!b.name || !Number.isFinite(Number(b.price)) || Number(b.price) < 0) return json({error:"Nom/prix requis."},400);
     await env.DB.prepare(
@@ -196,7 +225,7 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/admin/products" && request.method === "PUT") {
     const admin = await requireAdmin(request, env);
-    if (!admin) return json({error:"Accès refusé."},403);
+    if (admin instanceof Response) return admin;
     const b = await request.json();
     if (!b.name || !Number.isFinite(Number(b.price)) || Number(b.price) < 0) return json({error:"Nom/prix requis."},400);
     await env.DB.prepare(
