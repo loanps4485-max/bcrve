@@ -1,5 +1,25 @@
 const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}
-async function checkAdmin(){const el=document.getElementById("adminBar");if(!el)return;el.classList.add("hide");if(!tg?.initData)return;try{const r=await fetch("/api/admin/check",{headers:{"X-Telegram-Init-Data":tg.initData},cache:"no-store"});if(r.ok)el.classList.remove("hide")}catch(e){}}
+async function checkAdmin(){
+  const el=document.getElementById("adminBar");
+  const hint=document.getElementById("adminAccessHint");
+  if(!el)return;
+  el.classList.add("hide");
+  hint?.classList.add("hide");
+  if(!tg?.initData)return;
+  try{
+    const response=await fetch("/api/admin/check",{headers:{"X-Telegram-Init-Data":tg.initData},cache:"no-store"});
+    if(response.ok){el.classList.remove("hide");return}
+    const result=await response.json().catch(()=>({}));
+    if(hint){
+      hint.textContent=response.status===403
+        ?"Ce compte Telegram n’a pas l’accès administrateur."
+        :result.error||`Vérification admin indisponible (${response.status}).`;
+      hint.classList.remove("hide");
+    }
+  }catch(e){
+    if(hint){hint.textContent="Vérification admin indisponible. Réessaie dans un instant.";hint.classList.remove("hide")}
+  }
+}
 function openAdmin(){if(tg?.initData){try{sessionStorage.setItem("bcrve_telegram_init_data",tg.initData)}catch(e){}}if(tg?.HapticFeedback)tg.HapticFeedback.impactOccurred("light");location.href="/admin.html"}
 let products=[];let currentCategory="all";let favoriteIds=[];try{const storedFavorites=JSON.parse(localStorage.getItem("bcrve85_favorites")||"[]");if(Array.isArray(storedFavorites))favoriteIds=[...new Set(storedFavorites.map(Number).filter(id=>Number.isInteger(id)&&id>0))]}catch(e){try{localStorage.removeItem("bcrve85_favorites")}catch(ignore){}}let cartData=[];try{const stored=JSON.parse(localStorage.getItem("bcrve85_cart")||"[]");if(Array.isArray(stored))cartData=stored.filter(x=>x&&Number.isInteger(Number(x.id))&&Number(x.id)>0&&Number.isInteger(Number(x.qty))&&Number(x.qty)>0).map(x=>({id:Number(x.id),qty:Math.min(99,Number(x.qty))}))}catch(e){try{localStorage.removeItem("bcrve85_cart")}catch(ignore){}}const euro=n=>Number(n).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});const save=()=>{localStorage.setItem("bcrve85_cart",JSON.stringify(cartData));update()};function update(){const el=document.getElementById("count");if(el)el.textContent=cartData.reduce((a,x)=>a+x.qty,0)}
 async function loadProducts(){try{const r=await fetch("/api/products");if(!r.ok)throw new Error();products=await r.json();render();update()}catch(e){document.getElementById("products").innerHTML='<div class="empty">Catalogue indisponible pour le moment.</div>'}}
