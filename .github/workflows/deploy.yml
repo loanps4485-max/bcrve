@@ -61,7 +61,14 @@ jobs:
                   if required:
                       raise SystemExit(f"Telegram {method} check failed (HTTP {payload.get('error_code', 'unknown')}); token was not printed.")
                   description = str(payload.get("description", "")).lower()
-                  reason = "chat not found" if "chat not found" in description else "Telegram API error"
+                  if "chat not found" in description:
+                      reason = "chat not found"
+                  elif "user not found" in description:
+                      reason = "user not found"
+                  elif payload.get("error_code") == 403:
+                      reason = "forbidden by Telegram"
+                  else:
+                      reason = "Telegram API error (HTTP " + str(payload.get("error_code", "unknown")) + ")"
                   return {"_api_error": reason}
               return payload.get("result")
 
@@ -92,6 +99,12 @@ jobs:
                   "Menu button for allowlisted ID " + admin_id,
                   telegram("getChatMenuButton", {"chat_id": admin_id}),
               )
+              chat = telegram("getChat", {"chat_id": admin_id})
+              if chat and not chat.get("_api_error"):
+                  print("Private chat for allowlisted ID " + admin_id + ": available")
+              else:
+                  reason = chat.get("_api_error", "unavailable") if chat else "unavailable"
+                  print("Private chat for allowlisted ID " + admin_id + ": unavailable (" + reason + ")")
           PY
 
       - name: Remove legacy plaintext binding
