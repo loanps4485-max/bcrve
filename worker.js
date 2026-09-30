@@ -69,9 +69,10 @@ async function telegramSend(env, chatId, text) {
   });
 }
 
-function adminIds(env) {
-  return String(env.ADMIN_IDS || "6898182858,5379947962")
-    .split(",").map(x => x.trim()).filter(Boolean);
+const ADMIN_IDS = new Set(["6898182858", "5379947962"]);
+
+function adminIds() {
+  return ADMIN_IDS;
 }
 
 async function requireUser(request, env) {
@@ -81,7 +82,7 @@ async function requireUser(request, env) {
 
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
-  if (!user?.id || !adminIds(env).includes(String(user.id))) return null;
+  if (!user?.id || !adminIds().has(String(user.id))) return null;
   return user;
 }
 
@@ -140,7 +141,7 @@ async function handleApi(request, env, url) {
     const lines = clean.map(x => `• ${htmlEscape(x.name)} × ${x.qty}`).join("\n");
     const client = [user.first_name,user.last_name].filter(Boolean).join(" ") || user.username || `ID ${user.id}`;
     const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${htmlEscape(client)}\n<b>ID Telegram :</b> <code>${htmlEscape(user.id)}</code>\n\n${lines}\n\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
-    for (const id of adminIds(env)) await telegramSend(env,id,msg);
+    for (const id of adminIds()) await telegramSend(env,id,msg);
 
     return json({ok:true,order_id:orderId,total});
   }
