@@ -48,4 +48,74 @@ jobs:
             BOT_TOKEN
           command: deploy
 
+      - name: Verify Telegram authorization without creating an order
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import hmac
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          base_url = "https://bcrve.loanps4485.workers.dev"
+          bot_token = os.environ["BOT_TOKEN"].strip()
+
+          def signed_init_data(user_id):
+              fields = {
+                  "auth_date": str(int(time.time())),
+                  "user": json.dumps(
+                      {"id": int(user_id), "first_name": "Deployment check"},
+                      separators=(",", ":"),
+                  ),
+              }
+              check_string = "\\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
+              secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+              signature = hmac.new(secret_key, check_string.encode(), hashlib.sha256).hexdigest()
+              return urllib.parse.urlencode({**fields, "hash": signature})
+
+          def status(path, init_data=None, method="GET", body=None):
+              headers = {}
+              if init_data:
+                  headers["X-Telegram-Init-Data"] = init_data
+              if body is not None:
+                  headers["Content-Type"] = "application/json"
+              request = urllib.request.Request(
+                  base_url + path,
+                  data=body,
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      return response.status
+              except urllib.error.HTTPError as error:
+                  return error.code
+
+          for admin_id in (6898182858, 5379947962):
+              if status("/api/admin/check", signed_init_data(admin_id)) != 200:
+                  raise SystemExit("An allowlisted admin was not authorized.")
+
+          if status("/api/admin/check", signed_init_data(1111111111)) != 403:
+              raise SystemExit("A non-admin account was not rejected.")
+
+          if status("/api/admin/orders") != 401:
+              raise SystemExit("An unauthenticated admin API request was not rejected.")
+
+          empty_order_status = status(
+              "/api/orders",
+              signed_init_data(6898182858),
+              method="POST",
+              body=b'{"items":[]}',
+          )
+          if empty_order_status != 400:
+              raise SystemExit("A valid Telegram session did not reach order validation.")
+
+          print("Telegram authorization passed for both admins; unauthorized access was rejected; no order was created.")
+          PY
+
 # redeploy
