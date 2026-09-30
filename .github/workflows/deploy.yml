@@ -9,6 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # manual retry trigger
     permissions:
       contents: read
     steps:
