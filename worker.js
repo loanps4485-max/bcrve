@@ -139,6 +139,12 @@ async function handleApi(request, env, url) {
     return json({ok:true,order_id:orderId,total});
   }
 
+  if (url.pathname === "/api/admin/check" && request.method === "GET") {
+    const admin = await requireAdmin(request, env);
+    if (!admin) return json({error:"Accès refusé."},403);
+    return json({ok:true});
+  }
+
   if (url.pathname === "/api/admin/orders" && request.method === "GET") {
     const admin = await requireAdmin(request, env);
     if (!admin) return json({error:"Accès refusé."},403);
