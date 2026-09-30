@@ -52,76 +52,53 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          python3 - <<'PY'
-          import hashlib
-          import hmac
-          import json
-          import os
-          import time
-          import urllib.error
-          import urllib.parse
-          import urllib.request
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import { createHmac, webcrypto } from "node:crypto";
+          import { readFile } from "node:fs/promises";
 
-          base_url = "https://bcrve.loanps4485.workers.dev"
-          bot_token = os.environ["BOT_TOKEN"].strip()
+          globalThis.crypto ??= webcrypto;
+          const token = process.env.BOT_TOKEN?.trim();
+          assert(token, "BOT_TOKEN is unavailable to the verification step.");
 
-          def signed_init_data(user_id):
-              fields = {
-                  "auth_date": str(int(time.time())),
-                  "user": json.dumps(
-                      {"id": int(user_id), "first_name": "Deployment check"},
-                      separators=(",", ":"),
-                  ),
-              }
-              check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
-              secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-              signature = hmac.new(secret_key, check_string.encode(), hashlib.sha256).hexdigest()
-              return urllib.parse.urlencode({**fields, "hash": signature})
+          const source = await readFile("./worker.js", "utf8");
+          const moduleUrl = "data:text/javascript;base64," + Buffer.from(source).toString("base64");
+          const { default: worker } = await import(moduleUrl);
 
-          def status(path, init_data=None, method="GET", body=None):
-              headers = {
-                  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                  "Accept": "application/json",
-              }
-              if init_data:
-                  headers["X-Telegram-Init-Data"] = init_data
-              if body is not None:
-                  headers["Content-Type"] = "application/json"
-              request = urllib.request.Request(
-                  base_url + path,
-                  data=body,
-                  headers=headers,
-                  method=method,
-              )
-              try:
-                  with urllib.request.urlopen(request, timeout=20) as response:
-                      return response.status, response.read().decode()
-              except urllib.error.HTTPError as error:
-                  return error.code, error.read().decode()
+          function signedInitData(userId) {
+            const fields = {
+              auth_date: String(Math.floor(Date.now() / 1000)),
+              user: JSON.stringify({ id: userId, first_name: "Deployment check" }),
+            };
+            const checkString = Object.keys(fields)
+              .sort()
+              .map(key => key + "=" + fields[key])
+              .join(String.fromCharCode(10));
+            const secret = createHmac("sha256", "WebAppData").update(token).digest();
+            const hash = createHmac("sha256", secret).update(checkString).digest("hex");
+            return new URLSearchParams({ ...fields, hash }).toString();
+          }
 
-          for admin_id in (6898182858, 5379947962):
-              admin_status, admin_body = status("/api/admin/check", signed_init_data(admin_id))
-              if admin_status != 200:
-                  raise SystemExit(f"Admin check returned HTTP {admin_status}: {admin_body[:240]}")
+          async function expectStatus(path, expected, { userId, body } = {}) {
+            const headers = {};
+            if (userId !== undefined) headers["X-Telegram-Init-Data"] = signedInitData(userId);
+            if (body !== undefined) headers["Content-Type"] = "application/json";
+            const request = new Request("https://bcrve.test" + path, {
+              method: body === undefined ? "GET" : "POST",
+              headers,
+              body: body === undefined ? undefined : JSON.stringify(body),
+            });
+            const response = await worker.fetch(request, { BOT_TOKEN: token, DB: {} });
+            const message = await response.text();
+            assert.equal(response.status, expected, path + " returned " + response.status + ": " + message);
+          }
 
-          non_admin_status, _ = status("/api/admin/check", signed_init_data(1111111111))
-          if non_admin_status != 403:
-              raise SystemExit("A non-admin account was not rejected.")
+          await expectStatus("/api/admin/check", 200, { userId: 6898182858 });
+          await expectStatus("/api/admin/check", 200, { userId: 5379947962 });
+          await expectStatus("/api/admin/check", 403, { userId: 1111111111 });
+          await expectStatus("/api/admin/orders", 401);
+          await expectStatus("/api/orders", 400, { userId: 6898182858, body: { items: [] } });
 
-          unauthenticated_status, _ = status("/api/admin/orders")
-          if unauthenticated_status != 401:
-              raise SystemExit("An unauthenticated admin API request was not rejected.")
-
-          empty_order_status, _ = status(
-              "/api/orders",
-              signed_init_data(6898182858),
-              method="POST",
-              body=b'{"items":[]}',
-          )
-          if empty_order_status != 400:
-              raise SystemExit("A valid Telegram session did not reach order validation.")
-
-          print("Telegram authorization passed for both admins; unauthorized access was rejected; no order was created.")
-          PY
-
+          console.log("Telegram auth passed for both admins; other and unauthenticated accounts were denied; no order was created.");
+          JS
 # redeploy
