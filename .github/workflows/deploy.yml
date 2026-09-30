@@ -369,9 +369,26 @@ jobs:
               if status != 404:
                   raise SystemExit("An authorized unknown admin path did not return 404.")
 
-          status, _ = request_status("/api/admin/orders")
-          if status != 401:
-              raise SystemExit("The deployed Worker did not reject an unauthenticated admin request.")
+          protected_admin_requests = (
+              ("/api/admin/check", "GET", None),
+              ("/api/admin/orders", "GET", None),
+              ("/api/admin/orders/status", "POST", b"{}"),
+              ("/api/admin/products", "GET", None),
+              ("/api/admin/products", "POST", b"{}"),
+              ("/api/admin/products", "PUT", b"{}"),
+          )
+          for admin_path, method, body in protected_admin_requests:
+              status, _ = request_status(admin_path, method=method, body=body)
+              if status != 401:
+                  raise SystemExit(f"Unauthenticated {method} {admin_path} returned HTTP {status}, expected 401.")
+              status, _ = request_status(
+                  admin_path,
+                  signed_init_data(1111111111),
+                  method=method,
+                  body=body,
+              )
+              if status != 403:
+                  raise SystemExit(f"Signed non-admin {method} {admin_path} returned HTTP {status}, expected 403.")
 
           expired_data = signed_init_data(6898182858, int(time.time()) - 86401)
           status, body = request_status("/api/admin/check", expired_data)
@@ -406,6 +423,6 @@ jobs:
           if status != 400 or "Produit indisponible" not in body:
               raise SystemExit("The deployed order route did not reach the D1 product lookup.")
 
-          print("Live Cloudflare auth passed for both admins; unauthorized, expired, tampered, and unknown admin paths were rejected. A valid order session reached D1 product lookup; no order was created.")
+          print("Live Cloudflare auth passed for both admins; every known admin API, unknown admin paths, expired sessions, and tampered sessions were rejected appropriately. No real order was created.")
           PY
 # redeploy
