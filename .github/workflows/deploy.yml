@@ -158,12 +158,12 @@ jobs:
             return new URLSearchParams({ ...fields, hash }).toString();
           }
 
-          async function expectStatus(path, expected, { userId, body } = {}) {
+          async function expectStatus(path, expected, { userId, body, method } = {}) {
             const headers = {};
             if (userId !== undefined) headers["X-Telegram-Init-Data"] = signedInitData(userId);
             if (body !== undefined) headers["Content-Type"] = "application/json";
             const request = new Request("https://bcrve.test" + path, {
-              method: body === undefined ? "GET" : "POST",
+              method: method || (body === undefined ? "GET" : "POST"),
               headers,
               body: body === undefined ? undefined : JSON.stringify(body),
             });
@@ -174,8 +174,20 @@ jobs:
 
           await expectStatus("/api/admin/check", 200, { userId: 6898182858 });
           await expectStatus("/api/admin/check", 200, { userId: 5379947962 });
-          await expectStatus("/api/admin/check", 403, { userId: 1111111111 });
-          await expectStatus("/api/admin/orders", 401);
+
+          const adminRoutes = [
+            { path: "/api/admin/check", method: "GET" },
+            { path: "/api/admin/orders", method: "GET" },
+            { path: "/api/admin/orders/status", method: "POST", body: { id: 1, status: "ready" } },
+            { path: "/api/admin/products", method: "GET" },
+            { path: "/api/admin/products", method: "POST", body: { name: "Blocked", price: 1 } },
+            { path: "/api/admin/products", method: "PUT", body: { id: 1, name: "Blocked", price: 1 } },
+          ];
+          for (const route of adminRoutes) {
+            await expectStatus(route.path, 401, route);
+            await expectStatus(route.path, 403, { ...route, userId: 1111111111 });
+          }
+
           await expectStatus("/api/orders", 400, { userId: 6898182858, body: { items: [] } });
 
           console.log("Telegram auth passed for both admins; other and unauthenticated accounts were denied; no order was created.");
