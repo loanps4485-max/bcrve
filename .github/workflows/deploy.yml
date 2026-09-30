@@ -21,14 +21,7 @@ jobs:
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy worker.js --name bcrve --var "BOT_TOKEN:${BOT_TOKEN}"
-
-      - name: Deployment triggered
-        run: echo "BCRVE deployment check: $GITHUB_SHA"
-
-# trigger
+          command: deploy --name bcrve --var "BOT_TOKEN:${{ secrets.BOT_TOKEN }}"
