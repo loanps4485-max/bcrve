@@ -1,5 +1,5 @@
 const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}
-function checkAdmin(){const el=document.getElementById("adminBar");if(el&&tg?.initData)el.classList.remove("hide")}
+function checkAdmin(){const el=document.getElementById("adminBar");if(el)el.classList.remove("hide")}
 function openAdmin(){if(tg?.initData){try{sessionStorage.setItem("bcrve_telegram_init_data",tg.initData)}catch(e){}}if(tg?.HapticFeedback)tg.HapticFeedback.impactOccurred("light");location.href="/admin.html"}
 let products=[];let cartData=JSON.parse(localStorage.getItem("bcrve85_cart")||"[]");const euro=n=>Number(n).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});const save=()=>{localStorage.setItem("bcrve85_cart",JSON.stringify(cartData));update()};function update(){const el=document.getElementById("count");if(el)el.textContent=cartData.reduce((a,x)=>a+x.qty,0)}
 async function loadProducts(){try{const r=await fetch("/api/products");if(!r.ok)throw new Error();products=await r.json();render();update()}catch(e){document.getElementById("products").innerHTML='<div class="empty">Catalogue indisponible pour le moment.</div>'}}
