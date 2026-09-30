@@ -3,6 +3,12 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
 });
 
+function htmlEscape(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
 function parseInitData(initData) {
   if (!initData) return null;
   const params = new URLSearchParams(initData);
@@ -131,9 +137,9 @@ async function handleApi(request, env, url) {
     );
     await env.DB.batch(clean.map(x => stmt.bind(orderId,x.id,x.name,x.price,x.qty)));
 
-    const lines = clean.map(x => `• ${x.name} × ${x.qty}`).join("\n");
+    const lines = clean.map(x => `• ${htmlEscape(x.name)} × ${x.qty}`).join("\n");
     const client = [user.first_name,user.last_name].filter(Boolean).join(" ") || user.username || `ID ${user.id}`;
-    const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${client}\n<b>ID Telegram :</b> <code>${user.id}</code>\n\n${lines}\n\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
+    const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${htmlEscape(client)}\n<b>ID Telegram :</b> <code>${htmlEscape(user.id)}</code>\n\n${lines}\n\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
     for (const id of adminIds(env)) await telegramSend(env,id,msg);
 
     return json({ok:true,order_id:orderId,total});
@@ -180,10 +186,10 @@ async function handleApi(request, env, url) {
     const admin = await requireAdmin(request, env);
     if (!admin) return json({error:"Accès refusé."},403);
     const b = await request.json();
-    if (!b.name || !Number.isFinite(Number(b.price))) return json({error:"Nom/prix requis."},400);
+    if (!b.name || !Number.isFinite(Number(b.price)) || Number(b.price) < 0) return json({error:"Nom/prix requis."},400);
     await env.DB.prepare(
       "INSERT INTO products (name,sub,price,cat,active,sort_order) VALUES (?,?,?,?,1,?)"
-    ).bind(String(b.name),String(b.sub||""),Number(b.price),String(b.cat||"selection"),Number(b.sort_order||99)).run();
+    ).bind(String(b.name).trim(),String(b.sub||"").trim(),Number(b.price),String(b.cat||"selection"),Number(b.sort_order||99)).run();
     return json({ok:true});
   }
 
@@ -191,9 +197,10 @@ async function handleApi(request, env, url) {
     const admin = await requireAdmin(request, env);
     if (!admin) return json({error:"Accès refusé."},403);
     const b = await request.json();
+    if (!b.name || !Number.isFinite(Number(b.price)) || Number(b.price) < 0) return json({error:"Nom/prix requis."},400);
     await env.DB.prepare(
       "UPDATE products SET name=?,sub=?,price=?,cat=?,active=?,sort_order=? WHERE id=?"
-    ).bind(String(b.name),String(b.sub||""),Number(b.price),String(b.cat||"selection"),b.active?1:0,Number(b.sort_order||99),Number(b.id)).run();
+    ).bind(String(b.name).trim(),String(b.sub||"").trim(),Number(b.price),String(b.cat||"selection"),b.active?1:0,Number(b.sort_order||99),Number(b.id)).run();
     return json({ok:true});
   }
 
