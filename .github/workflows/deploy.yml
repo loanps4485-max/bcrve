@@ -79,7 +79,10 @@ jobs:
               return urllib.parse.urlencode({**fields, "hash": signature})
 
           def status(path, init_data=None, method="GET", body=None):
-              headers = {}
+              headers = {
+                  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "Accept": "application/json",
+              }
               if init_data:
                   headers["X-Telegram-Init-Data"] = init_data
               if body is not None:
