@@ -240,6 +240,26 @@ jobs:
             assert.equal(successFixture.counts.items, 1);
             assert.equal(successfulNotifications, 2);
 
+            let partialNotificationCalls = 0;
+            globalThis.fetch = async () => {
+              partialNotificationCalls += 1;
+              if (partialNotificationCalls === 1) {
+                return new Response(
+                  JSON.stringify({ ok: false, error_code: 400, description: "Bad Request: chat not found" }),
+                  { status: 400 },
+                );
+              }
+              return new Response(JSON.stringify({ ok: true }), { status: 200 });
+            };
+            const partialFixture = fakeDatabase();
+            const partialResponse = await submitSyntheticOrder(partialFixture.DB);
+            const partialData = await partialResponse.json();
+            assert.equal(partialResponse.status, 200);
+            assert.equal(partialData.notifications_delivered, 1);
+            assert.equal(partialFixture.counts.orders, 1);
+            assert.equal(partialFixture.counts.items, 1);
+            assert.equal(partialNotificationCalls, 2);
+
             globalThis.fetch = async () => {
               throw new Error("synthetic network failure");
             };
@@ -254,7 +274,7 @@ jobs:
             globalThis.fetch = originalFetch;
           }
 
-          console.log("Synthetic order persistence passed; notification success and failure were handled without a real order.");
+          console.log("Synthetic order persistence passed for successful, partial Telegram, and network-failure alerts; no real order was created.");
           JS
 
       - name: Verify authorization against the deployed Worker
