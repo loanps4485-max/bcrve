@@ -17,6 +17,7 @@ jobs:
 
       - name: Prepare public assets
         run: |
+          node --check app.js
           mkdir -p public
           cp index.html admin.html app.js admin.js styles.css admin.css public/
 
