@@ -22,13 +22,62 @@ jobs:
           mkdir -p public
           cp index.html admin.html app.js admin.js styles.css admin.css public/
 
-      - name: Validate Telegram bot token
+      - name: Validate token and inspect Mini App entry points
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          test -n "$BOT_TOKEN"
-          curl --fail --silent --show-error "https://api.telegram.org/bot${BOT_TOKEN}/getMe" |
-            python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]; print("Telegram bot token valid for @" + d.get("username","unknown") + " (id " + str(d["id"]) + ").")'
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("BOT_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("BOT_TOKEN is missing from GitHub Actions.")
+
+          def telegram(method, parameters=None, required=False):
+              query = urllib.parse.urlencode(parameters or {})
+              url = f"https://api.telegram.org/bot{token}/{method}"
+              if query:
+                  url += "?" + query
+              try:
+                  with urllib.request.urlopen(url, timeout=15) as response:
+                      payload = json.load(response)
+              except Exception as error:
+                  if required:
+                      raise SystemExit(f"Telegram {method} check failed ({type(error).__name__}); token was not printed.")
+                  return None
+              if not payload.get("ok"):
+                  return None
+              return payload.get("result")
+
+          bot = telegram("getMe", required=True)
+          if not bot:
+              raise SystemExit("Telegram rejected getMe; token was not printed.")
+          print("Telegram bot token valid for @" + bot.get("username", "unknown") +
+                " (id " + str(bot["id"]) + ").")
+          print("Main Mini App configured: " + ("yes" if bot.get("has_main_web_app") else "no"))
+
+          def describe_menu(label, menu):
+              if not menu:
+                  print(label + ": unavailable")
+                  return
+              details = "type=" + str(menu.get("type", "unknown"))
+              web_app = menu.get("web_app") or {}
+              if web_app.get("url"):
+                  parsed = urllib.parse.urlsplit(web_app["url"])
+                  details += ", URL host/path=" + parsed.netloc + parsed.path
+              print(label + ": " + details)
+
+          describe_menu("Default Telegram menu button", telegram("getChatMenuButton"))
+          for admin_id in ("6898182858", "5379947962"):
+              describe_menu(
+                  "Menu button for allowlisted ID " + admin_id,
+                  telegram("getChatMenuButton", {"chat_id": admin_id}),
+              )
+          PY
 
       - name: Remove legacy plaintext binding
         uses: cloudflare/wrangler-action@v4
@@ -103,4 +152,96 @@ jobs:
 
           console.log("Telegram auth passed for both admins; other and unauthenticated accounts were denied; no order was created.");
           JS
+
+      - name: Verify authorization against the deployed Worker
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import hmac
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          base_url = "https://bcrve.loanps4485.workers.dev"
+          bot_token = os.environ["BOT_TOKEN"].strip()
+          browser_headers = {
+              "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+              "Accept": "application/json",
+          }
+
+          def signed_init_data(user_id, auth_date=None):
+              fields = {
+                  "auth_date": str(auth_date or int(time.time())),
+                  "chat_instance": "-1001234567890123",
+                  "chat_type": "private",
+                  "query_id": "AAEAAQABDeploymentCheck",
+                  "signature": "CI-only-placeholder",
+                  "user": json.dumps(
+                      {"id": int(user_id), "first_name": "Déploiement & contrôle", "username": "ci_check"},
+                      ensure_ascii=False,
+                      separators=(",", ":"),
+                  ),
+              }
+              check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
+              secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+              signature = hmac.new(secret_key, check_string.encode(), hashlib.sha256).hexdigest()
+              return urllib.parse.urlencode({**fields, "hash": signature})
+
+          def request_status(path, init_data=None, method="GET", body=None):
+              headers = dict(browser_headers)
+              if init_data is not None:
+                  headers["X-Telegram-Init-Data"] = init_data
+              if body is not None:
+                  headers["Content-Type"] = "application/json"
+              request = urllib.request.Request(base_url + path, data=body, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      return response.status, response.read().decode("utf-8")
+              except urllib.error.HTTPError as error:
+                  return error.code, error.read().decode("utf-8")
+
+          for admin_id in (6898182858, 5379947962):
+              status, body = request_status("/api/admin/check", signed_init_data(admin_id))
+              if status != 200:
+                  raise SystemExit(f"Deployed admin check returned HTTP {status}: {body[:240]}")
+
+          status, _ = request_status("/api/admin/check", signed_init_data(1111111111))
+          if status != 403:
+              raise SystemExit("The deployed Worker did not reject a signed non-admin account.")
+
+          status, _ = request_status("/api/admin/orders")
+          if status != 401:
+              raise SystemExit("The deployed Worker did not reject an unauthenticated admin request.")
+
+          expired_data = signed_init_data(6898182858, int(time.time()) - 86401)
+          status, body = request_status("/api/admin/check", expired_data)
+          if status != 401 or "expirée" not in body:
+              raise SystemExit("The deployed Worker did not reject an expired Mini App session.")
+
+          valid_data = signed_init_data(6898182858)
+          tampered = urllib.parse.parse_qs(valid_data, keep_blank_values=True)
+          tampered["user"] = [json.dumps({"id": 1111111111, "first_name": "Tampered"})]
+          status, _ = request_status(
+              "/api/admin/check",
+              urllib.parse.urlencode({key: values[0] for key, values in tampered.items()}),
+          )
+          if status != 401:
+              raise SystemExit("The deployed Worker accepted modified signed Mini App data.")
+
+          status, _ = request_status(
+              "/api/orders",
+              signed_init_data(6898182858),
+              method="POST",
+              body=b'{"items":[]}',
+          )
+          if status != 400:
+              raise SystemExit("A valid deployed Telegram session did not reach order validation.")
+
+          print("Live Cloudflare auth passed for both admins; non-admin, unauthenticated, expired, and tampered sessions were rejected. No order was created.")
+          PY
 # redeploy
