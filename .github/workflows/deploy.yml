@@ -20,6 +20,14 @@ jobs:
           mkdir -p public
           cp index.html admin.html app.js admin.js styles.css admin.css public/
 
+      - name: Validate Telegram bot token
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          test -n "$BOT_TOKEN"
+          curl --fail --silent --show-error "https://api.telegram.org/bot${BOT_TOKEN}/getMe" |
+            python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]; print("Telegram bot token valid for @" + d.get("username","unknown") + " (id " + str(d["id"]) + ").")'
+
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         env:
