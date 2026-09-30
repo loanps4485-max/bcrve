@@ -184,3 +184,270 @@ nav em{font-style:normal;background:var(--ink);color:#fff;border-radius:20px;pad
   .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .visual{height:190px}
 }
+
+
+/* ===== BCRVE85 — MODE COMPACT ===== */
+@media (max-width:599px){
+  body{
+    padding-top:max(48px,var(--tg-top));
+    padding-bottom:calc(72px + var(--tg-bottom));
+  }
+  .app{
+    min-height:calc(var(--tg-viewport-height,100dvh) - max(48px,var(--tg-top)));
+    padding-bottom:8px;
+  }
+  header{
+    padding:12px 16px 14px;
+  }
+  header small{font-size:8px}
+  h1{
+    font-size:29px;
+    line-height:.94;
+    margin:5px 0;
+  }
+  .round{
+    width:36px;
+    height:36px;
+    font-size:15px;
+  }
+  .hero{
+    min-height:285px;
+    margin:0 12px;
+    padding:20px;
+    border-radius:21px;
+  }
+  .hero b{font-size:8px}
+  .hero h2{
+    font-size:25px;
+    line-height:1.02;
+    margin:7px 0 10px;
+  }
+  .hero p{
+    font-size:12px;
+    line-height:1.4;
+    margin:0 0 14px;
+    max-width:300px;
+  }
+  .dark{
+    padding:10px 16px;
+    font-size:13px;
+  }
+  section#shop{
+    padding:24px 14px 12px;
+  }
+  section#shop h2{
+    font-size:25px;
+    margin:6px 0;
+  }
+  .chips{
+    gap:6px;
+    padding:11px 0;
+  }
+  .chip{
+    padding:7px 11px;
+    font-size:12px;
+  }
+  .grid{
+    gap:9px;
+  }
+  .card{
+    padding:8px;
+    border-radius:16px;
+  }
+  .visual{
+    height:118px;
+    border-radius:12px;
+  }
+  .visual span{font-size:28px}
+  .info{
+    padding:8px 2px 2px;
+  }
+  .name{font-size:13px}
+  .sub{
+    font-size:10px;
+    margin-top:2px;
+  }
+  .row{
+    margin-top:8px;
+  }
+  .price{font-size:13px}
+  .add{
+    width:30px;
+    height:30px;
+    font-size:18px;
+  }
+  nav{
+    height:calc(64px + var(--tg-bottom));
+  }
+  nav button{
+    font-size:18px;
+  }
+  nav button span{
+    font-size:8px;
+    margin-top:2px;
+  }
+  nav em{
+    font-size:7px;
+    padding:1px 4px;
+  }
+  .admin-bar{
+    bottom:calc(64px + var(--tg-bottom) + 8px);
+  }
+  .admin-bar button{
+    padding:8px 14px;
+    font-size:11px;
+  }
+  .modal{
+    padding:calc(48px + var(--tg-top)) 10px calc(74px + var(--tg-bottom));
+  }
+  #sheet,.sheet{
+    width:min(100%,430px);
+    max-height:min(76dvh,calc(var(--tg-viewport-stable-height,100dvh) - 108px));
+    padding:16px 16px 18px;
+    border-radius:21px;
+  }
+  .sheet h3,#sheet h3{
+    font-size:24px;
+    margin:3px 0 14px;
+  }
+  .line{
+    padding:11px 0;
+    gap:12px;
+    font-size:13px;
+  }
+  .line button{
+    min-width:30px;
+    min-height:30px;
+  }
+  .full{
+    padding:12px;
+    margin-top:13px;
+    font-size:13px;
+  }
+  .notice{
+    padding:10px;
+    font-size:11px;
+    margin-top:10px;
+  }
+  .empty{
+    padding:24px;
+    font-size:13px;
+  }
+}
+
+
+/* ===== CENTRAGE ÉCRAN — sans changer le design ===== */
+html, body{
+  width:100%;
+  min-width:0;
+  overflow-x:hidden;
+}
+body{
+  display:flex;
+  justify-content:center;
+}
+.app{
+  width:100%;
+  max-width:720px;
+  margin-left:auto;
+  margin-right:auto;
+}
+header,
+section#shop{
+  width:100%;
+}
+.hero{
+  margin-left:auto;
+  margin-right:auto;
+}
+nav{
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+}
+.modal{
+  justify-content:center;
+  align-items:center;
+}
+#sheet,
+.sheet{
+  margin-left:auto;
+  margin-right:auto;
+}
+@media(max-width:599px){
+  .app{
+    width:100%;
+    max-width:430px;
+  }
+  header,
+  section#shop{
+    width:100%;
+  }
+  .hero{
+    width:calc(100% - 24px);
+  }
+}
+
+
+/* ===== MENUS — alignement propre et lisible ===== */
+nav{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  align-items:stretch;
+  justify-items:stretch;
+  gap:0;
+  padding-left:max(6px, env(safe-area-inset-left));
+  padding-right:max(6px, env(safe-area-inset-right));
+  box-sizing:border-box;
+}
+nav button{
+  min-width:0;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  padding:7px 2px 5px;
+  line-height:1;
+  white-space:nowrap;
+}
+nav button span{
+  line-height:1.1;
+  margin:0;
+}
+nav button.active{
+  font-weight:800;
+}
+nav em{
+  vertical-align:middle;
+  margin-left:2px;
+}
+.admin-bar{
+  width:100%;
+  display:flex;
+  justify-content:center;
+  pointer-events:none;
+}
+.admin-bar button{
+  pointer-events:auto;
+  box-shadow:0 6px 18px rgba(0,0,0,.12);
+}
+@media(max-width:599px){
+  nav{
+    height:calc(68px + var(--tg-bottom));
+  }
+  nav button{
+    font-size:19px;
+    padding-top:6px;
+  }
+  nav button span{
+    font-size:9px;
+  }
+  nav em{
+    font-size:7px;
+  }
+  .admin-bar{
+    bottom:calc(68px + var(--tg-bottom) + 8px);
+  }
+}
