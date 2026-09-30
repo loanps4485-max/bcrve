@@ -92,21 +92,24 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(request, timeout=20) as response:
-                      return response.status
+                      return response.status, response.read().decode()
               except urllib.error.HTTPError as error:
-                  return error.code
+                  return error.code, error.read().decode()
 
           for admin_id in (6898182858, 5379947962):
-              if status("/api/admin/check", signed_init_data(admin_id)) != 200:
-                  raise SystemExit("An allowlisted admin was not authorized.")
+              admin_status, admin_body = status("/api/admin/check", signed_init_data(admin_id))
+              if admin_status != 200:
+                  raise SystemExit(f"Admin check returned HTTP {admin_status}: {admin_body[:240]}")
 
-          if status("/api/admin/check", signed_init_data(1111111111)) != 403:
+          non_admin_status, _ = status("/api/admin/check", signed_init_data(1111111111))
+          if non_admin_status != 403:
               raise SystemExit("A non-admin account was not rejected.")
 
-          if status("/api/admin/orders") != 401:
+          unauthenticated_status, _ = status("/api/admin/orders")
+          if unauthenticated_status != 401:
               raise SystemExit("An unauthenticated admin API request was not rejected.")
 
-          empty_order_status = status(
+          empty_order_status, _ = status(
               "/api/orders",
               signed_init_data(6898182858),
               method="POST",
