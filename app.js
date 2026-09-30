@@ -14,9 +14,9 @@ function show(html){
   const modal=document.getElementById("modal");
   const sheet=document.getElementById("sheet");
   sheet.innerHTML=html;
-  Object.assign(modal.style,{position:"fixed",inset:"0",zIndex:"100",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px",background:"rgba(0,0,0,.42)",overflow:"hidden"});
-  Object.assign(sheet.style,{position:"relative",display:"block",boxSizing:"border-box",width:"min(430px,calc(100vw - 32px))",maxWidth:"calc(100vw - 32px)",maxHeight:"calc(100dvh - 140px)",margin:"0",padding:"20px 18px 22px",background:"#fffdfa",color:"#181817",borderRadius:"24px",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.22)",flex:"0 1 auto"});
   modal.classList.remove("hide");
+  Object.assign(modal.style,{position:"fixed",left:"0",top:"0",right:"0",bottom:"0",width:"100vw",height:"100dvh",zIndex:"10000",display:"block",padding:"0",margin:"0",background:"rgba(0,0,0,.42)",overflow:"hidden"});
+  Object.assign(sheet.style,{position:"fixed",left:"50%",top:"50%",transform:"translate(-50%,-50%)",boxSizing:"border-box",display:"block",width:"min(430px,calc(100vw - 32px))",maxWidth:"calc(100vw - 32px)",maxHeight:"calc(100dvh - 120px)",margin:"0",padding:"20px 18px 22px",background:"#fffdfa",color:"#181817",borderRadius:"24px",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.22)",zIndex:"10001"});
   sheet.scrollTop=0;
 }
 function closeModal(){const modal=document.getElementById("modal");modal.classList.add("hide");modal.style.display="none"}
