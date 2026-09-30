@@ -316,8 +316,17 @@ jobs:
               body=b'{"items":[]}',
           )
           if status != 400:
-              raise SystemExit("A valid deployed Telegram session did not reach order validation.")
+              raise SystemExit("A valid deployed Telegram session did not reach empty-cart validation.")
 
-          print("Live Cloudflare auth passed for both admins; non-admin, unauthenticated, expired, and tampered sessions were rejected. No order was created.")
+          status, body = request_status(
+              "/api/orders",
+              signed_init_data(6898182858),
+              method="POST",
+              body=b'{"items":[{"id":-1,"qty":1}]}',
+          )
+          if status != 400 or "Produit indisponible" not in body:
+              raise SystemExit("The deployed order route did not reach the D1 product lookup.")
+
+          print("Live Cloudflare auth passed for both admins; unauthorized, expired, and tampered sessions were rejected. A valid order session reached D1 product lookup; no order was created.")
           PY
 # redeploy
