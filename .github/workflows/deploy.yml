@@ -48,9 +48,13 @@ jobs:
               except Exception as error:
                   if required:
                       raise SystemExit(f"Telegram {method} check failed ({type(error).__name__}); token was not printed.")
-                  return None
+                  return {"_api_error": "HTTP transport unavailable"}
               if not payload.get("ok"):
-                  return None
+                  if required:
+                      raise SystemExit(f"Telegram {method} check failed (HTTP {payload.get('error_code', 'unknown')}); token was not printed.")
+                  description = str(payload.get("description", "")).lower()
+                  reason = "chat not found" if "chat not found" in description else "Telegram API error"
+                  return {"_api_error": reason}
               return payload.get("result")
 
           bot = telegram("getMe", required=True)
@@ -63,6 +67,9 @@ jobs:
           def describe_menu(label, menu):
               if not menu:
                   print(label + ": unavailable")
+                  return
+              if menu.get("_api_error"):
+                  print(label + ": unavailable (" + menu["_api_error"] + ")")
                   return
               details = "type=" + str(menu.get("type", "unknown"))
               web_app = menu.get("web_app") or {}
