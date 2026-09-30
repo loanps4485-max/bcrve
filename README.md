@@ -4,7 +4,7 @@ Boutique mobile, catalogue et commandes gérés par un Cloudflare Worker et une 
 
 - **Boutique publique :** https://bcrve.loanps4485.workers.dev
 - **Mini App :** ouvre la boutique depuis le bot Telegram [@Bcrvee85_bot](https://t.me/Bcrvee85_bot).
-- Le lien public permet de consulter le catalogue. Les commandes et l’administration nécessitent une session Mini App Telegram valide.
+- Le lien public permet de consulter le catalogue. Le bouton **Partager** ouvre le menu de partage de l’appareil ou copie le lien pour l’envoyer où tu veux. Les commandes et l’administration nécessitent une session Mini App Telegram valide.
 
 ## Parcours client
 
