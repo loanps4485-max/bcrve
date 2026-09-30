@@ -24,7 +24,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy worker.js --name bcrve
+          command: deploy worker.js --name bcrve --var BOT_TOKEN:${{ secrets.BOT_TOKEN }}
 
       - name: Deployment triggered
         run: echo "BCRVE deployment completed"
