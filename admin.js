@@ -5,10 +5,18 @@ const euro=n=>Number(n).toLocaleString("fr-FR",{style:"currency",currency:"EUR"}
 let catalogProducts=[];
 async function api(url,opt={}){opt.headers={...(opt.headers||{}),...headers(),"content-type":"application/json"};const r=await fetch(url,opt);const d=await r.json();if(!r.ok)throw new Error(d.error||"Erreur");return d}
 async function load(){
+ let orders;
+ try{
+  orders=await api("/api/admin/orders");
+  document.getElementById("adminAccessStatus").classList.add("hide");
+  document.getElementById("adminApp").classList.remove("hide");
+ }catch(e){
+  const status=document.getElementById("adminAccessStatus");
+  status.innerHTML='<strong>Accès réservé aux comptes admin.</strong><br>'+esc(e.message)+'<br><small>Ouvre la boutique depuis le bot Telegram.</small><br><a href="https://t.me/Bcrvee85_bot" target="_blank" rel="noopener noreferrer">Ouvrir le bot Telegram ↗</a>';
+  return;
+ }
  const ordersEl=document.getElementById("orders");
  const productsEl=document.getElementById("products");
- let orders;
- try{orders=await api("/api/admin/orders")}catch(e){const message='<div class="empty">'+esc(e.message)+'<br><small>Ouvre cette page depuis Telegram avec un compte admin.</small></div>';ordersEl.innerHTML=message;productsEl.innerHTML=message;return}
  document.getElementById("newCount").textContent=orders.filter(o=>o.status==="new").length;
  document.getElementById("cashTotal").textContent=euro(orders.filter(o=>o.status!=="delivered"&&o.status!=="cancelled").reduce((a,o)=>a+Number(o.total),0));
  document.getElementById("readyCount").textContent=orders.filter(o=>o.status==="ready").length;
