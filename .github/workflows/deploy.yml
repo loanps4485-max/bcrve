@@ -13,26 +13,26 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Prepare public assets
         run: |
           mkdir -p public
           cp index.html admin.html app.js admin.js styles.css admin.css public/
 
-      - name: Upload Worker secret
+      - name: Prepare secret file
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           printf 'BOT_TOKEN=%s\n' "$BOT_TOKEN" > .secrets
-          npx wrangler@latest secret bulk .secrets --name bcrve
-          rm -f .secrets
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy --secrets-file .secrets
+
+      - name: Remove secret file
+        if: always()
+        run: rm -f .secrets
