@@ -5,7 +5,12 @@ async function checkAdmin(){
   if(!el)return;
   el.classList.add("hide");
   hint?.classList.add("hide");
-  if(!tg?.initData)return;
+  const telegramLaunch=Boolean(tg?.initData)||/(?:^|[&#])tgWebApp(?:Data|Version|Platform)=/.test(location.hash);
+  if(!telegramLaunch)return;
+  if(!tg?.initData){
+    if(hint){hint.textContent="Session Telegram absente. Ouvre la boutique depuis le bouton de @Bcrvee85_bot.";hint.classList.remove("hide")}
+    return;
+  }
   try{
     const response=await fetch("/api/admin/check",{headers:{"X-Telegram-Init-Data":tg.initData},cache:"no-store"});
     if(response.ok){el.classList.remove("hide");return}
