@@ -224,7 +224,7 @@ async function handleApi(request, env, url) {
       const eligible = ids.length ? clean.filter(item => ids.includes(Number(item.id))) : clean;
       return { promotion:p, quantity:eligible.reduce((sum,item)=>sum+item.qty,0), subtotal:eligible.reduce((sum,item)=>sum+item.price*item.qty,0) };
     });
-    const eligiblePromotion = candidates.filter(x => Number(x.promotion.min_qty)<=x.quantity && Number(x.promotion.discount_percent)>0 && x.subtotal>0).sort((a,b)=>Number(b.promotion.discount_percent)-Number(a.promotion.discount_percent)||Number(b.promotion.min_qty)-Number(a.promotion.min_qty))[0] || null;
+    const eligiblePromotion = candidates.filter(x => Number(x.promotion.min_qty)<=x.quantity && Number(x.promotion.discount_percent)>0 && x.subtotal>0).sort((a,b)=>Number(b.promotion.min_qty)-Number(a.promotion.min_qty)||Number(b.promotion.discount_percent)-Number(a.promotion.discount_percent))[0] || null;
     const promotion = eligiblePromotion?.promotion || null;
     const discountPercent = promotion ? Number(promotion.discount_percent) : 0;
     const discountQty = eligiblePromotion ? Math.min(Number(promotion.min_qty), Number(eligiblePromotion.quantity)) : 0;
