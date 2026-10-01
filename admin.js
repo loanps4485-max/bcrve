@@ -25,6 +25,7 @@ async function load(){
  ordersEl.innerHTML=orders.length?orders.map(o=>'<article class="item order-card"><div class="order-main"><div class="order-title"><b>#'+Number(o.id)+' · '+esc(o.telegram_name)+'</b><span class="status-pill status-'+esc(o.status)+'">'+label(o.status)+'</span></div><p>'+esc(o.items)+'</p><strong>'+euro(o.total)+'</strong> · espèces<br><small>'+esc(o.created_at)+'</small></div><div class="order-actions"><button class="reply-client" type="button" onclick="replyToClient('+Number(o.id)+',\''+esc(o.telegram_name).replace(/'/g,"&#39;")+'\')">💬 Répondre</button><div class="quick-status">'+["new","preparing","ready","delivered","cancelled"].map(s=>'<button class="status-btn '+(s===o.status?"selected":"")+'" type="button" onclick="setStatus('+Number(o.id)+',\''+s+'\')" '+(s===o.status?"disabled":"")+'>'+label(s)+'</button>').join("")+'</div></div></article>').join(""):'<div class="empty">Aucune commande.</div>';
  try{
   catalogProducts=await api("/api/admin/products");
+  renderPromotionProducts();
   productsEl.innerHTML=catalogProducts.map(p=>{
    const id=Number(p.id);
    const active=Boolean(p.active);
@@ -39,7 +40,11 @@ async function load(){
   if(el)el.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
  }
 }
-function toDbDate(value){
+function renderPromotionProducts(){
+ const el=document.getElementById("promoProducts"); if(!el)return;
+ el.innerHTML=catalogProducts.length?catalogProducts.map(p=>'<label class="promo-product-option"><input type="checkbox" value="'+Number(p.id)+'"> <span>'+esc(p.name)+'</span></label>').join(""):'<small>Aucun article disponible.</small>';
+}
+
  if(!value)return null;
  return new Date(value).toISOString().slice(0,19).replace("T"," ");
 }
@@ -48,6 +53,8 @@ function formatPromoDate(value){
  return new Date(value.replace(" ","T")+"Z").toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
 }
 function renderPromotions(list){
+ const names=new Map(catalogProducts.map(p=>[Number(p.id),p.name]));
+
  const el=document.getElementById("promotions");
  if(!el)return;
  const now=Date.now();
@@ -55,7 +62,7 @@ function renderPromotions(list){
   const start=p.starts_at?new Date(p.starts_at.replace(" ","T")).getTime():null;
   const end=p.ends_at?new Date(p.ends_at.replace(" ","T")).getTime():null;
   const state=!p.active?"Désactivée":(start&&now<start?"Programmée":(end&&now>end?"Terminée":"Active"));
-  return '<article class="item promotion-item"><div><b>'+Number(p.min_qty)+' produits → -'+Number(p.discount_percent).toLocaleString("fr-FR")+'%</b><p>'+formatPromoDate(p.starts_at)+' → '+formatPromoDate(p.ends_at)+'</p><span class="product-state '+(state==="Active"?"active":"")+'">'+state+'</span></div><button type="button" class="edit-product" onclick="deletePromotion('+Number(p.id)+')">Supprimer</button></article>';
+  return '<article class="item promotion-item"><div><b>'+Number(p.min_qty)+' produits → -'+Number(p.discount_percent).toLocaleString("fr-FR")+'%</b><p>Articles : '+((p.product_ids||[]).map(id=>esc(names.get(Number(id))||("Produit #"+id))).join(", ")||"Tous les articles")+'</p><p>'+formatPromoDate(p.starts_at)+' → '+formatPromoDate(p.ends_at)+'</p><span class="product-state '+(state==="Active"?"active":"")+'">'+state+'</span></div><button type="button" class="edit-product" onclick="deletePromotion('+Number(p.id)+')">Supprimer</button></article>';
  }).join(""):'<div class="empty">Aucune réduction planifiée.</div>';
 }
 async function deletePromotion(id){
@@ -72,7 +79,8 @@ document.getElementById("promotionForm").addEventListener("submit",async event=>
    min_qty:Number(document.getElementById("promoQty").value),
    discount_percent:Number(document.getElementById("promoPercent").value),
    starts_at:toDbDate(document.getElementById("promoStart").value),
-   ends_at:toDbDate(document.getElementById("promoEnd").value)
+   ends_at:toDbDate(document.getElementById("promoEnd").value),
+   product_ids:[...document.querySelectorAll("#promoProducts input:checked")].map(input=>Number(input.value))
   })});
   form.reset();
   await load();
