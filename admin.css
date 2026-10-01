@@ -7,3 +7,5 @@
 @media(min-width:560px){.order-card{grid-template-columns:1.2fr .8fr}.quick-status{grid-template-columns:repeat(2,1fr)}}
 
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.section-head h2{margin:28px 0 12px}.refresh-btn{border:1px solid #ddd8d0;background:#fffdfa;color:#181817;border-radius:10px;padding:8px 11px;font-weight:750;font-size:11px}.refresh-btn:disabled{opacity:.55}
+
+.promotion-item{align-items:center}.promotion-item p{margin:6px 0}.promotion-item .edit-product{color:#a22}.add-form{margin-top:12px}
