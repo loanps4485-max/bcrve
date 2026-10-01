@@ -8,3 +8,5 @@
 .secondary-action{background:#eef0f5;color:#101b35;margin-top:8px}
 
 .order-progress{display:flex;gap:6px;margin-top:10px}.order-progress span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#edf0f5;color:#8b93a4;font-size:12px;opacity:.7}.order-progress span.done{background:#101b35;color:#fff;opacity:1}.order-history{padding:15px 0}.status-text{font-weight:700;margin-top:4px}
+
+.cart-line{align-items:center;gap:12px}.cart-product{flex:1;min-width:0}.cart-controls{text-align:right}.qty-total{font-weight:800;margin-bottom:6px}.qty-buttons{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap}.qty-buttons button,.qty-buttons strong{min-width:34px;height:32px;border:1px solid #ddd8d0;border-radius:8px;background:#fffdfa;display:inline-grid;place-items:center;font-size:12px;font-weight:750}.qty-buttons button{cursor:pointer}.qty-buttons button:disabled{opacity:.35;cursor:not-allowed}.qty-buttons strong{background:#101b35;color:#fff;border-color:#101b35;padding:0 8px}@media(max-width:420px){.qty-buttons{gap:3px}.qty-buttons button,.qty-buttons strong{min-width:30px;height:30px;font-size:11px}}
