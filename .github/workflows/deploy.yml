@@ -258,7 +258,7 @@ jobs:
             assert.equal(successData.notifications_delivered, 2);
             assert.equal(successFixture.counts.orders, 1);
             assert.equal(successFixture.counts.items, 1);
-            assert.equal(successfulNotifications, 2);
+            assert.equal(successfulNotifications, 3);
 
             let partialNotificationCalls = 0;
             globalThis.fetch = async () => {
@@ -276,9 +276,10 @@ jobs:
             const partialData = await partialResponse.json();
             assert.equal(partialResponse.status, 200);
             assert.equal(partialData.notifications_delivered, 1);
+            assert.equal(partialData.client_status_delivered, true);
             assert.equal(partialFixture.counts.orders, 1);
             assert.equal(partialFixture.counts.items, 1);
-            assert.equal(partialNotificationCalls, 2);
+            assert.equal(partialNotificationCalls, 3);
 
             globalThis.fetch = async () => {
               throw new Error("synthetic network failure");
@@ -288,8 +289,10 @@ jobs:
             const failureData = await failureResponse.json();
             assert.equal(failureResponse.status, 200);
             assert.equal(failureData.notifications_delivered, 0);
+            assert.equal(failureData.client_status_delivered, false);
             assert.equal(failureFixture.counts.orders, 1);
             assert.equal(failureFixture.counts.items, 1);
+            assert.equal(successfulNotifications, 3);
           } finally {
             globalThis.fetch = originalFetch;
           }
