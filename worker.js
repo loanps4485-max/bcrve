@@ -117,10 +117,10 @@ function orderStatusLabel(status) {
 async function notifyClientStatus(env, order) {
   const status = orderStatusLabel(order.status);
   const text = order.status === "delivered"
-    ? `📦 <b>Commande #${order.id} remise</b>\\n\\nMerci pour ta commande ❤️`
+    ? `📦 <b>Commande #${order.id} remise</b>\n\nMerci pour ta commande ❤️`
     : order.status === "cancelled"
-      ? `❌ <b>Commande #${order.id} annulée</b>\\n\\nSi besoin, contacte-nous directement ici.`
-      : `${status.emoji} <b>Commande #${order.id}</b>\\n\\nStatut : <b>${htmlEscape(status.label)}</b>`;
+      ? `❌ <b>Commande #${order.id} annulée</b>\n\nSi besoin, contacte-nous directement ici.`
+      : `${status.emoji} <b>Commande #${order.id}</b>\n\nStatut : <b>${htmlEscape(status.label)}</b>`;
   return telegramSend(env, order.telegram_user_id, text);
 }
 
@@ -218,7 +218,19 @@ async function handleApi(request, env, url) {
       [...adminIds()].map(id => telegramSend(env,id,msg,replyMarkup))
     )).filter(Boolean).length;
 
-    return json({ok:true,order_id:orderId,total,notifications_delivered:notificationsDelivered});
+    const clientStatusDelivered = await telegramSend(
+      env,
+      String(user.id),
+      `🛍️ <b>Commande #${orderId} enregistrée</b>\n\nStatut : <b>🆕 Nouvelle</b>\nTotal : <b>${total.toFixed(2).replace(".",",")} €</b>\nPaiement : espèces\n\nTu recevras ici chaque changement de statut.`
+    );
+
+    return json({
+      ok:true,
+      order_id:orderId,
+      total,
+      notifications_delivered:notificationsDelivered,
+      client_status_delivered:clientStatusDelivered
+    });
   }
 
   if (url.pathname === "/api/orders" && request.method === "GET") {
