@@ -9,3 +9,5 @@
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.section-head h2{margin:28px 0 12px}.refresh-btn{border:1px solid #ddd8d0;background:#fffdfa;color:#181817;border-radius:10px;padding:8px 11px;font-weight:750;font-size:11px}.refresh-btn:disabled{opacity:.55}
 
 .promotion-item{align-items:center}.promotion-item p{margin:6px 0}.promotion-item .edit-product{color:#a22}.add-form{margin-top:12px}
+
+.promo-products{border:1px solid #ded9d1;border-radius:12px;padding:12px}.promo-products legend{padding:0 6px;color:#716d66;font-size:12px;font-weight:700}.promo-products>div{display:grid;gap:7px;max-height:180px;overflow:auto}.promo-product-option{display:flex!important;grid-template-columns:none!important;align-items:center!important;gap:8px!important;padding:7px 8px;background:#f7f5f1;border-radius:9px;color:#181817!important;font-size:12px!important}.promo-product-option input{width:18px!important;height:18px!important;padding:0!important;margin:0!important}
