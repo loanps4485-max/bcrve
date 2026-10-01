@@ -41,7 +41,7 @@ function getCartPromotion(){
   const eligible=ids.length?cartData.filter(x=>ids.includes(Number(x.id))):cartData;
   return {p,qty:eligible.reduce((sum,x)=>sum+x.qty,0),subtotal:eligible.reduce((sum,x)=>{const product=products.find(y=>y.id===x.id);return sum+(product?product.price*x.qty:0)},0)};
  }).filter(x=>x.qty>=Number(x.p.min_qty)&&x.subtotal>0);
- return candidates.sort((a,b)=>Number(b.p.discount_percent)-Number(a.p.discount_percent)||Number(b.p.min_qty)-Number(a.p.min_qty))[0]||null;
+ return candidates.sort((a,b)=>Number(b.p.min_qty)-Number(a.p.min_qty)||Number(b.p.discount_percent)-Number(a.p.discount_percent))[0]||null;
 }
 function cart(btn){
  if(btn)nav(btn);
