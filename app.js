@@ -68,7 +68,7 @@ function cart(btn){
  }
  const discount=promoMatch?Math.round(discountBase*Number(promo.discount_percent))/100:0;
  const total=Math.round((subtotal-discount)*100)/100;
- const promoNotice=promo?'<div class="notice discount-notice">🎉 Remise quantité : <b>-'+Number(promo.discount_percent).toLocaleString("fr-FR")+'%</b> ('+promoMatch.qty+' articles concernés)<br><span>Sous-total : '+euro(subtotal)+' · Économie : '+euro(discount)+'</span></div>':promotions.length?'<div class="notice">Ajoute plus de produits pour débloquer une remise quantité.</div>':"";
+ const promoNotice=promo?'<div class="notice discount-notice">🎉 Remise quantité : <b>-'+Number(promo.discount_percent).toLocaleString("fr-FR")+'%</b> ('+discountQty+' articles concernés)<br><span>Sous-total : '+euro(subtotal)+' · Économie : '+euro(discount)+'</span></div>':promotions.length?'<div class="notice">Ajoute plus de produits pour débloquer une remise quantité.</div>':"";
  show('<button class="close" onclick="closeModal()">×</button><h3>Votre panier</h3>'+(lines||'<div class="empty">Votre panier est vide.</div>')+(cartData.length?'<div class="line"><b>Sous-total</b><b>'+euro(subtotal)+'</b></div>'+promoNotice+'<div class="line"><b>Total</b><b>'+euro(total)+'</b></div><div class="notice">Paiement : <b>espèces</b> lors de la remise.</div><button class="full" onclick="order()">Confirmer la commande</button>':""));
 }
 function removeItem(id){let x=cartData.find(x=>x.id===id);if(!x)return;x.qty--;if(x.qty<=0)cartData=cartData.filter(x=>x.id!==id);save();cart()}
