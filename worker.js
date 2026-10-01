@@ -184,7 +184,7 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/products" && request.method === "GET") {
     const { results } = await env.DB.prepare(
-      "SELECT id,name,sub,price,cat,active,sort_order FROM products WHERE active=1 ORDER BY sort_order,id"
+      "SELECT id,name,sub,price,cat,active,sort_order,stock,low_stock_threshold FROM products WHERE active=1 ORDER BY sort_order,id"
     ).all();
     return json(results);
   }
@@ -202,7 +202,7 @@ async function handleApi(request, env, url) {
     const ids = items.map(x => Number(x.id)).filter(Number.isInteger);
     const placeholders = ids.map(()=>"?").join(",");
     const { results: products } = await env.DB.prepare(
-      `SELECT id,name,price FROM products WHERE active=1 AND id IN (${placeholders})`
+      `SELECT id,name,price,stock FROM products WHERE active=1 AND id IN (${placeholders})`
     ).bind(...ids).all();
 
     const byId = new Map(products.map(p => [Number(p.id), p]));
@@ -212,6 +212,7 @@ async function handleApi(request, env, url) {
       const p = byId.get(Number(item.id));
       const qty = Math.max(1, Math.min(99, Number(item.qty)||1));
       if (!p) return json({error:"Produit indisponible."},400);
+      if (Number(p.stock) < qty) return json({error:String(p.name)+" : stock insuffisant (reste "+Number(p.stock)+" unités)."},409);
       subtotal += Number(p.price) * qty;
       clean.push({id:p.id,name:p.name,price:Number(p.price),qty});
     }
@@ -229,6 +230,10 @@ async function handleApi(request, env, url) {
     const discountBase = eligiblePromotion ? eligiblePromotion.subtotal : 0;
     const discount = Math.round(discountBase * discountPercent) / 100;
     const total = Math.round((subtotal - discount)*100)/100;
+
+    const stockUpdates = clean.map(x => env.DB.prepare("UPDATE products SET stock=stock-? WHERE id=? AND stock>=?").bind(x.qty,x.id,x.qty));
+    const stockResults = await env.DB.batch(stockUpdates);
+    if (stockResults.some(result => Number(result.meta?.changes || 0) !== 1)) return json({error:"Stock insuffisant. Actualise le panier puis réessaie."},409);
 
     const order = await env.DB.prepare(
       `INSERT INTO orders (telegram_user_id,telegram_name,total,payment,status,created_at)
@@ -397,6 +402,20 @@ async function handleApi(request, env, url) {
     if (!Number.isInteger(id) || id <= 0) return json({error:"Promotion invalide."},400);
     await env.DB.prepare("DELETE FROM promotion_products WHERE promotion_id=?").bind(id).run();
     await env.DB.prepare("DELETE FROM promotions WHERE id=?").bind(id).run();
+    return json({ok:true});
+  }
+
+  if (url.pathname === "/api/admin/stock" && request.method === "GET") {
+    const { results } = await env.DB.prepare("SELECT id,name,stock,low_stock_threshold,active FROM products ORDER BY sort_order,id").all();
+    return json(results);
+  }
+
+  if (url.pathname === "/api/admin/stock" && request.method === "PUT") {
+    let body; try { body = await request.json(); } catch { return json({error:"JSON invalide."},400); }
+    const id=Number(body.id), stock=Number(body.stock), threshold=Number(body.low_stock_threshold);
+    if(!Number.isInteger(id)||id<=0||!Number.isInteger(stock)||stock<0||!Number.isInteger(threshold)||threshold<0) return json({error:"Stock invalide."},400);
+    const result=await env.DB.prepare("UPDATE products SET stock=?,low_stock_threshold=? WHERE id=?").bind(stock,threshold,id).run();
+    if(!result.meta?.changes) return json({error:"Produit introuvable."},404);
     return json({ok:true});
   }
 
