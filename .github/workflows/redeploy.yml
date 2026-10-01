@@ -12,6 +12,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare public assets
+        run: |
+          mkdir -p public
+          cp index.html admin.html app.js admin.js styles.css admin.css public/
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v4
         with:
