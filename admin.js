@@ -1,5 +1,5 @@
 const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}
-const telegramInitData=()=>{if(tg?.initData)return tg.initData;try{return new URLSearchParams(location.hash.slice(1)).get("tgWebAppData")||""}catch(e){return""}};
+const telegramInitData=()=>{if(tg?.initData)return tg.initData;try{const params=new URLSearchParams(location.search);return params.get("tgWebAppData")||new URLSearchParams(location.hash.slice(1)).get("tgWebAppData")||""}catch(e){return""}};
 const headers=()=>{let initData=telegramInitData();if(!initData){try{initData=sessionStorage.getItem("bcrve_telegram_init_data")||""}catch(e){}}return{"X-Telegram-Init-Data":initData}};
 const euro=n=>Number(n).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
 let catalogProducts=[];
