@@ -22,7 +22,7 @@ async function load(){
  document.getElementById("newCount").textContent=orders.filter(o=>o.status==="new").length;
  document.getElementById("cashTotal").textContent=euro(orders.filter(o=>o.status!=="delivered"&&o.status!=="cancelled").reduce((a,o)=>a+Number(o.total),0));
  document.getElementById("readyCount").textContent=orders.filter(o=>o.status==="ready").length;
- ordersEl.innerHTML=orders.length?orders.map(o=>'<article class="item order-card"><div class="order-main"><div class="order-title"><b>#'+Number(o.id)+' · '+esc(o.telegram_name)+'</b><span class="status-pill status-'+esc(o.status)+'">'+label(o.status)+'</span></div><p>'+esc(o.items)+'</p><strong>'+euro(o.total)+'</strong> · espèces<br><small>'+esc(o.created_at)+'</small></div><div class="order-actions"><a class="reply-client" href="tg://user?id='+encodeURIComponent(String(o.telegram_user_id))+'">💬 Répondre</a><div class="quick-status">'+["new","preparing","ready","delivered","cancelled"].map(s=>'<button class="status-btn '+(s===o.status?"selected":"")+'" type="button" onclick="setStatus('+Number(o.id)+',\''+s+'\')" '+(s===o.status?"disabled":"")+'>'+label(s)+'</button>').join("")+'</div></div></article>').join(""):'<div class="empty">Aucune commande.</div>';
+ ordersEl.innerHTML=orders.length?orders.map(o=>'<article class="item order-card"><div class="order-main"><div class="order-title"><b>#'+Number(o.id)+' · '+esc(o.telegram_name)+'</b><span class="status-pill status-'+esc(o.status)+'">'+label(o.status)+'</span></div><p>'+esc(o.items)+'</p><strong>'+euro(o.total)+'</strong> · espèces<br><small>'+esc(o.created_at)+'</small></div><div class="order-actions"><button class="reply-client" type="button" onclick="replyToClient('+Number(o.id)+',\''+esc(o.telegram_name).replace(/'/g,"&#39;")+'\')">💬 Répondre</button><div class="quick-status">'+["new","preparing","ready","delivered","cancelled"].map(s=>'<button class="status-btn '+(s===o.status?"selected":"")+'" type="button" onclick="setStatus('+Number(o.id)+',\''+s+'\')" '+(s===o.status?"disabled":"")+'>'+label(s)+'</button>').join("")+'</div></div></article>').join(""):'<div class="empty">Aucune commande.</div>';
  try{
   catalogProducts=await api("/api/admin/products");
   productsEl.innerHTML=catalogProducts.map(p=>{
@@ -44,6 +44,15 @@ async function setStatus(id,status){
     alert(e.message);
     buttons.forEach(b=>b.disabled=false);
   }
+}
+async function replyToClient(id,name){
+ const message=prompt("Message pour "+name+" · commande #"+id);
+ if(message===null)return;
+ if(!message.trim())return alert("Écris un message avant d’envoyer.");
+ try{
+  await api("/api/admin/orders/reply",{method:"POST",body:JSON.stringify({id,message:message.trim()})});
+  alert("Message envoyé au client sur Telegram ✅");
+ }catch(e){alert(e.message)}
 }
 function openProductEditor(id){
  const product=catalogProducts.find(item=>Number(item.id)===Number(id));
