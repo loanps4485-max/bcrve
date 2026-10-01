@@ -80,24 +80,48 @@ async function verifyTelegramInitData(initData, botToken, maxAge = 86400) {
   return { user, error: null };
 }
 
-async function telegramSend(env, chatId, text) {
+async function telegramSend(env, chatId, text, replyMarkup = null) {
   const botToken = String(env.BOT_TOKEN || "").trim();
   if (!botToken || !chatId) return false;
   try {
+    const payload = { chat_id: chatId, text, parse_mode: "HTML" };
+    if (replyMarkup) payload.reply_markup = replyMarkup;
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: {"content-type":"application/json"},
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
+      body: JSON.stringify(payload)
     });
     let result = null;
     try { result = await response.json(); } catch {}
     const delivered = response.ok && result?.ok === true;
-    if (!delivered) console.warn(`Telegram order notification was not delivered (HTTP ${response.status}).`);
+    if (!delivered) console.warn(`Telegram message was not delivered (HTTP ${response.status}).`);
     return delivered;
   } catch {
-    console.warn("Telegram order notification request failed.");
+    console.warn("Telegram message request failed.");
     return false;
   }
+}
+
+const ORDER_STATUSES = {
+  new: { label: "Nouvelle", emoji: "🆕" },
+  preparing: { label: "En préparation", emoji: "👨‍🍳" },
+  ready: { label: "Prête", emoji: "✅" },
+  delivered: { label: "Remise", emoji: "📦" },
+  cancelled: { label: "Annulée", emoji: "❌" }
+};
+
+function orderStatusLabel(status) {
+  return ORDER_STATUSES[status] || { label: status || "Inconnu", emoji: "ℹ️" };
+}
+
+async function notifyClientStatus(env, order) {
+  const status = orderStatusLabel(order.status);
+  const text = order.status === "delivered"
+    ? `📦 <b>Commande #${order.id} remise</b>\\n\\nMerci pour ta commande ❤️`
+    : order.status === "cancelled"
+      ? `❌ <b>Commande #${order.id} annulée</b>\\n\\nSi besoin, contacte-nous directement ici.`
+      : `${status.emoji} <b>Commande #${order.id}</b>\\n\\nStatut : <b>${htmlEscape(status.label)}</b>`;
+  return telegramSend(env, order.telegram_user_id, text);
 }
 
 const ADMIN_IDS = new Set(["6898182858", "5379947962"]);
@@ -185,11 +209,29 @@ async function handleApi(request, env, url) {
     const lines = clean.map(x => `• ${htmlEscape(x.name)} × ${x.qty}`).join("\n");
     const client = [user.first_name,user.last_name].filter(Boolean).join(" ") || user.username || `ID ${user.id}`;
     const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${htmlEscape(client)}\n<b>ID Telegram :</b> <code>${htmlEscape(user.id)}</code>\n\n${lines}\n\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
+    const replyMarkup = {
+      inline_keyboard: [[
+        { text: "💬 Répondre au client", url: `tg://user?id=${encodeURIComponent(String(user.id))}` }
+      ]]
+    };
     const notificationsDelivered = (await Promise.all(
-      [...adminIds()].map(id => telegramSend(env,id,msg))
+      [...adminIds()].map(id => telegramSend(env,id,msg,replyMarkup))
     )).filter(Boolean).length;
 
     return json({ok:true,order_id:orderId,total,notifications_delivered:notificationsDelivered});
+  }
+
+  if (url.pathname === "/api/orders" && request.method === "GET") {
+    const auth = await authenticateRequest(request, env);
+    if (!auth.user) return json({error:auth.error.message}, auth.error.status);
+    const { results } = await env.DB.prepare(`
+      SELECT id,total,payment,status,created_at
+      FROM orders
+      WHERE telegram_user_id=?
+      ORDER BY id DESC
+      LIMIT 20
+    `).bind(String(auth.user.id)).all();
+    return json(results);
   }
 
   if (url.pathname === "/api/admin/check" && request.method === "GET") {
@@ -207,11 +249,22 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/orders/status" && request.method === "POST") {
-    const body = await request.json();
+    let body;
+    try { body = await request.json(); } catch { return json({error:"JSON invalide."},400); }
     const allowed = ["new","preparing","ready","delivered","cancelled"];
-    if (!allowed.includes(body.status)) return json({error:"Statut invalide."},400);
-    await env.DB.prepare("UPDATE orders SET status=? WHERE id=?").bind(body.status, Number(body.id)).run();
-    return json({ok:true});
+    const id = Number(body.id);
+    if (!Number.isInteger(id) || id <= 0 || !allowed.includes(body.status)) return json({error:"Commande ou statut invalide."},400);
+
+    const current = await env.DB.prepare(
+      "SELECT id,telegram_user_id,status FROM orders WHERE id=?"
+    ).bind(id).first();
+    if (!current) return json({error:"Commande introuvable."},404);
+    if (current.status === body.status) return json({ok:true,changed:false});
+
+    await env.DB.prepare("UPDATE orders SET status=? WHERE id=?").bind(body.status,id).run();
+    const updated = {...current,status:body.status};
+    const notified = await notifyClientStatus(env, updated);
+    return json({ok:true,changed:true,client_notified:notified});
   }
 
   if (url.pathname === "/api/admin/products" && request.method === "GET") {
