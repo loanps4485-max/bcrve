@@ -45,29 +45,33 @@ function getCartPromotion(){
 }
 function cart(btn){
  if(btn)nav(btn);
- let lines=cartData.map(x=>{let p=products.find(p=>p.id===x.id);if(!p)return "";
- return '<div class="line cart-line"><div class="cart-product"><b>'+escapeHtml(p.name)+'</b><div class="sub">'+euro(p.price)+' / unité</div></div><div class="cart-controls"><div class="qty-total">'+euro(p.price*x.qty)+'</div><div class="qty-buttons"><button type="button" onclick="changeQty('+p.id+',-10)" '+(x.qty<=1?"disabled":"")+'">−10</button><button type="button" onclick="changeQty('+p.id+',-5)" '+(x.qty<=1?"disabled":"")+'">−5</button><button type="button" onclick="changeQty('+p.id+',-1)" '+(x.qty<=1?"disabled":"")+'">−1</button><strong>'+x.qty+'</strong><button type="button" onclick="changeQty('+p.id+',1)">+1</button><button type="button" onclick="changeQty('+p.id+',5)">+5</button><button type="button" onclick="changeQty('+p.id+',10)">+10</button></div></div></div>'}).join("");
  let subtotal=cartData.reduce((sum,x)=>{let p=products.find(p=>p.id===x.id);return sum+(p?p.price*x.qty:0)},0);
  subtotal=Math.round(subtotal*100)/100;
- const totalQuantity=cartData.reduce((sum,x)=>sum+x.qty,0);
  const promoMatch=getCartPromotion();
  const promo=promoMatch?.p||null;
  const discountQty=promoMatch?Math.min(Number(promo.min_qty),Number(promoMatch.qty)):0;
+ const discountedQtyById=new Map();
  let remainingDiscountQty=discountQty;
- let discountBase=0;
  if(promoMatch){
    const ids=Array.isArray(promo.product_ids)?promo.product_ids:[];
    for(const item of cartData){
      if(ids.length&&!ids.includes(Number(item.id)))continue;
-     const product=products.find(y=>y.id===item.id);
      const qtyForDiscount=Math.min(item.qty,Math.max(0,remainingDiscountQty));
-     discountBase+=(product?product.price*qtyForDiscount:0);
+     if(qtyForDiscount>0)discountedQtyById.set(Number(item.id),qtyForDiscount);
      remainingDiscountQty-=qtyForDiscount;
      if(remainingDiscountQty<=0)break;
    }
  }
+ const discountBase=cartData.reduce((sum,x)=>{const p=products.find(p=>p.id===x.id);const q=discountedQtyById.get(Number(x.id))||0;return sum+(p?p.price*q:0)},0);
  const discount=promoMatch?Math.round(discountBase*Number(promo.discount_percent))/100:0;
  const total=Math.round((subtotal-discount)*100)/100;
+ let lines=cartData.map(x=>{let p=products.find(p=>p.id===x.id);if(!p)return "";
+   const discountedQty=discountedQtyById.get(Number(x.id))||0;
+   const normalQty=Math.max(0,x.qty-discountedQty);
+   const discountedUnitPrice=p.price*(1-Number(promo?.discount_percent||0)/100);
+   const lineTotal=(discountedQty*discountedUnitPrice)+(normalQty*p.price);
+   const priceInfo=discountedQty>0?'<div class="sub"><s>'+euro(p.price)+'</s> '+euro(discountedUnitPrice)+' / unité · '+discountedQty+' remisée(s)'+(normalQty>0?' · '+normalQty+' au tarif normal':'')+'</div>':'<div class="sub">'+euro(p.price)+' / unité</div>';
+   return '<div class="line cart-line"><div class="cart-product"><b>'+escapeHtml(p.name)+'</b>'+priceInfo+'</div><div class="cart-controls"><div class="qty-total">'+euro(lineTotal)+'</div><div class="qty-buttons"><button type="button" onclick="changeQty('+p.id+',-10)" '+(x.qty<=1?"disabled":"")+'">−10</button><button type="button" onclick="changeQty('+p.id+',-5)" '+(x.qty<=1?"disabled":"")+'">−5</button><button type="button" onclick="changeQty('+p.id+',-1)" '+(x.qty<=1?"disabled":"")+'">−1</button><strong>'+x.qty+'</strong><button type="button" onclick="changeQty('+p.id+',1)">+1</button><button type="button" onclick="changeQty('+p.id+',5)">+5</button><button type="button" onclick="changeQty('+p.id+',10)">+10</button></div></div></div>'}).join("");
  const promoNotice=promo?'<div class="notice discount-notice">🎉 Remise quantité : <b>-'+Number(promo.discount_percent).toLocaleString("fr-FR")+'%</b> ('+discountQty+' articles concernés)<br><span>Sous-total : '+euro(subtotal)+' · Économie : '+euro(discount)+'</span></div>':promotions.length?'<div class="notice">Ajoute plus de produits pour débloquer une remise quantité.</div>':"";
  show('<button class="close" onclick="closeModal()">×</button><h3>Votre panier</h3>'+(lines||'<div class="empty">Votre panier est vide.</div>')+(cartData.length?'<div class="line"><b>Sous-total</b><b>'+euro(subtotal)+'</b></div>'+promoNotice+'<div class="line"><b>Total</b><b>'+euro(total)+'</b></div><div class="notice">Paiement : <b>espèces</b> lors de la remise.</div><button class="full" onclick="order()">Confirmer la commande</button>':""));
 }
