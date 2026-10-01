@@ -107,6 +107,14 @@ jobs:
                   print("Private chat for allowlisted ID " + admin_id + ": unavailable (" + reason + ")")
           PY
 
+      - name: Apply D1 migrations
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.144.0"
+          command: d1 migrations apply bcrve-db --remote
+
       - name: Remove legacy plaintext binding
         uses: cloudflare/wrangler-action@v4
         with:
