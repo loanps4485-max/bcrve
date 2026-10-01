@@ -32,6 +32,7 @@ async function load(){
   }).join("")||'<div class="empty">Aucun produit.</div>';
  }catch(e){productsEl.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
 }
+function finishRefresh(){const refresh=document.getElementById("refreshButton");if(refresh){refresh.disabled=false;refresh.textContent="↻ Actualiser"}}
 function label(s){return ({new:"Nouvelle",preparing:"Préparation",ready:"Prête",delivered:"Remise",cancelled:"Annulée"})[s]||s}
 async function setStatus(id,status){
   const buttons=[...document.querySelectorAll(".status-btn")];
