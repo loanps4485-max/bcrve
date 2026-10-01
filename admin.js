@@ -6,6 +6,8 @@ let catalogProducts=[];
 async function api(url,opt={}){opt.headers={...(opt.headers||{}),...headers(),"content-type":"application/json"};const r=await fetch(url,opt);const d=await r.json();if(!r.ok)throw new Error(d.error||"Erreur");return d}
 async function load(){
  let orders;
+ const refresh=document.getElementById("refreshButton");
+ if(refresh){refresh.disabled=true;refresh.textContent="Actualisation…"} 
  try{
   orders=await api("/api/admin/orders");
   document.getElementById("adminAccessStatus").classList.add("hide");
@@ -89,3 +91,5 @@ function hasProductDraft(){return !document.getElementById("editProductPanel").c
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 load();setInterval(()=>{if(!hasProductDraft())load()},30000);
+
+function refreshOrders(){load()}
