@@ -133,7 +133,17 @@ async function getQuantityPromotions(env, includeScheduled = false) {
     : "SELECT id,min_qty,discount_percent,starts_at,ends_at,active FROM promotions WHERE active=1 AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?) ORDER BY min_qty DESC,discount_percent DESC,id DESC";
   const query = env.DB.prepare(sql);
   const result = includeScheduled ? await query.all() : await query.bind(now, now).all();
-  return result.results || [];
+  const promotions = result.results || [];
+  if (!promotions.length) return [];
+  const ids = promotions.map(p => Number(p.id));
+  const placeholders = ids.map(() => "?").join(",");
+  const links = await env.DB.prepare("SELECT promotion_id,product_id FROM promotion_products WHERE promotion_id IN (" + placeholders + ")").bind(...ids).all();
+  const byPromo = new Map();
+  for (const row of (links.results || [])) {
+    if (!byPromo.has(Number(row.promotion_id))) byPromo.set(Number(row.promotion_id), []);
+    byPromo.get(Number(row.promotion_id)).push(Number(row.product_id));
+  }
+  return promotions.map(p => ({...p, product_ids: byPromo.get(Number(p.id)) || []}));
 }
 
 function bestQuantityPromotion(promotions, quantity) {
@@ -208,9 +218,16 @@ async function handleApi(request, env, url) {
     subtotal = Math.round(subtotal*100)/100;
     const totalQuantity = clean.reduce((sum, item) => sum + item.qty, 0);
     const promotions = await getQuantityPromotions(env);
-    const promotion = bestQuantityPromotion(promotions, totalQuantity);
+    const candidates = promotions.map(p => {
+      const ids = Array.isArray(p.product_ids) ? p.product_ids : [];
+      const eligible = ids.length ? clean.filter(item => ids.includes(Number(item.id))) : clean;
+      return { promotion:p, quantity:eligible.reduce((sum,item)=>sum+item.qty,0), subtotal:eligible.reduce((sum,item)=>sum+item.price*item.qty,0) };
+    });
+    const eligiblePromotion = candidates.filter(x => Number(x.promotion.min_qty)<=x.quantity && Number(x.promotion.discount_percent)>0 && x.subtotal>0).sort((a,b)=>Number(b.promotion.discount_percent)-Number(a.promotion.discount_percent)||Number(b.promotion.min_qty)-Number(a.promotion.min_qty))[0] || null;
+    const promotion = eligiblePromotion?.promotion || null;
     const discountPercent = promotion ? Number(promotion.discount_percent) : 0;
-    const discount = Math.round(subtotal * discountPercent) / 100;
+    const discountBase = eligiblePromotion ? eligiblePromotion.subtotal : 0;
+    const discount = Math.round(discountBase * discountPercent) / 100;
     const total = Math.round((subtotal - discount)*100)/100;
 
     const order = await env.DB.prepare(
