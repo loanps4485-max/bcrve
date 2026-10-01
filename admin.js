@@ -40,6 +40,25 @@ async function load(){
   if(el)el.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
  }
 }
+async function loadStock(){
+ const list=await api("/api/admin/stock");
+ const el=document.getElementById("stockList"); if(!el)return;
+ el.innerHTML=list.map(p=>{
+  const stock=Number(p.stock), threshold=Number(p.low_stock_threshold);
+  const state=stock===0?"Rupture":(stock<=threshold?"Stock faible":"En stock");
+  return '<article class="stock-card"><div class="stock-info"><b>'+esc(p.name)+'</b><span class="product-state '+(stock>threshold?"active":"")+'">'+state+'</span></div><div class="stock-fields"><label>Quantité<input class="stock-input" data-id="'+Number(p.id)+'" type="number" min="0" max="999999" value="'+stock+'"></label><label>Seuil d’alerte<input class="threshold-input" data-id="'+Number(p.id)+'" type="number" min="0" max="999999" value="'+threshold+'"></label><button type="button" class="edit-product" onclick="saveStock('+Number(p.id)+')">Enregistrer</button></div></article>';
+ }).join("")||'<div class="empty">Aucun produit.</div>';
+}
+async function saveStock(id){
+ const stock=Number(document.querySelector('.stock-input[data-id="'+id+'"]').value);
+ const threshold=Number(document.querySelector('.threshold-input[data-id="'+id+'"]').value);
+ try{await api("/api/admin/stock",{method:"PUT",body:JSON.stringify({id,stock,low_stock_threshold:threshold})});await loadStock()}catch(e){alert(e.message)}
+}
+function showAdminTab(tab){
+ document.querySelectorAll("[data-admin-panel]").forEach(el=>el.classList.toggle("hide",el.dataset.adminPanel!==tab));
+ document.querySelectorAll("[data-admin-tab]").forEach(el=>el.classList.toggle("on",el.dataset.adminTab===tab));
+ if(tab==="stock")loadStock().catch(e=>{const el=document.getElementById("stockList");if(el)el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'});
+}
 function renderPromotionProducts(){
  const el=document.getElementById("promoProducts"); if(!el)return;
  el.innerHTML=catalogProducts.length?catalogProducts.map(p=>'<label class="promo-product-option"><input type="checkbox" value="'+Number(p.id)+'"> <span>'+esc(p.name)+'</span></label>').join(""):'<small>Aucun article disponible.</small>';
