@@ -19,3 +19,25 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.144.0"
           command: deploy
+
+      - name: Point Telegram menu to current Mini App
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.parse, urllib.request
+          token = os.environ["BOT_TOKEN"].strip()
+          url = "https://api.telegram.org/bot" + token + "/setChatMenuButton"
+          payload = urllib.parse.urlencode({
+              "menu_button": json.dumps({
+                  "type": "web_app",
+                  "text": "🛍️ Ouvrir la boutique",
+                  "web_app": {"url": "https://bcrve.loanps4485.workers.dev"}
+              }, ensure_ascii=False)
+          }).encode()
+          with urllib.request.urlopen(urllib.request.Request(url, data=payload, method="POST"), timeout=20) as r:
+              result = json.load(r)
+          if not result.get("ok"):
+              raise SystemExit("Telegram setChatMenuButton failed: " + str(result))
+          print("Telegram menu now points to the current BCRVE Mini App.")
+          PY
