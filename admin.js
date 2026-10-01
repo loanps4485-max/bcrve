@@ -31,7 +31,50 @@ async function load(){
    return '<article class="item product-item"><div><b>'+esc(p.name)+'</b><p>'+esc(p.sub)+' · '+euro(p.price)+'</p><span class="product-state '+(active?"active":"inactive")+'">'+(active?"Visible":"Masqué")+'</span></div><button type="button" class="edit-product" aria-label="Modifier '+esc(p.name)+'" onclick="openProductEditor('+id+')">Modifier</button></article>';
   }).join("")||'<div class="empty">Aucun produit.</div>';
  }catch(e){productsEl.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+ try{
+  const promotions=await api("/api/admin/promotions");
+  renderPromotions(promotions);
+ }catch(e){
+  const el=document.getElementById("promotions");
+  if(el)el.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+ }
 }
+function formatPromoDate(value){
+ if(!value)return "Sans limite";
+ return new Date(value.replace(" ","T")).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+function renderPromotions(list){
+ const el=document.getElementById("promotions");
+ if(!el)return;
+ const now=Date.now();
+ el.innerHTML=list.length?list.map(p=>{
+  const start=p.starts_at?new Date(p.starts_at.replace(" ","T")).getTime():null;
+  const end=p.ends_at?new Date(p.ends_at.replace(" ","T")).getTime():null;
+  const state=!p.active?"Désactivée":(start&&now<start?"Programmée":(end&&now>end?"Terminée":"Active"));
+  return '<article class="item promotion-item"><div><b>'+Number(p.min_qty)+' produits → -'+Number(p.discount_percent).toLocaleString("fr-FR")+'%</b><p>'+formatPromoDate(p.starts_at)+' → '+formatPromoDate(p.ends_at)+'</p><span class="product-state '+(state==="Active"?"active":"")+'">'+state+'</span></div><button type="button" class="edit-product" onclick="deletePromotion('+Number(p.id)+')">Supprimer</button></article>';
+ }).join(""):'<div class="empty">Aucune réduction planifiée.</div>';
+}
+async function deletePromotion(id){
+ if(!confirm("Supprimer cette réduction ?"))return;
+ try{await api("/api/admin/promotions?id="+encodeURIComponent(id),{method:"DELETE"});await load()}catch(e){alert(e.message)}
+}
+document.getElementById("promotionForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const form=event.currentTarget,error=document.getElementById("promoError"),button=form.querySelector('button[type="submit"]');
+ if(error)error.textContent="";
+ if(button){button.disabled=true;button.textContent="Planification…"}
+ try{
+  await api("/api/admin/promotions",{method:"POST",body:JSON.stringify({
+   min_qty:Number(document.getElementById("promoQty").value),
+   discount_percent:Number(document.getElementById("promoPercent").value),
+   starts_at:document.getElementById("promoStart").value,
+   ends_at:document.getElementById("promoEnd").value
+  })});
+  form.reset();
+  await load();
+ }catch(e){if(error)error.textContent=e.message}
+ finally{if(button){button.disabled=false;button.textContent="Planifier la réduction"}}
+});
 function finishRefresh(){const refresh=document.getElementById("refreshButton");if(refresh){refresh.disabled=false;refresh.textContent="↻ Actualiser"}}
 function label(s){return ({new:"Nouvelle",preparing:"Préparation",ready:"Prête",delivered:"Remise",cancelled:"Annulée"})[s]||s}
 async function setStatus(id,status){
