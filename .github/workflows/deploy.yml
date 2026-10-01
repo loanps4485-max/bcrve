@@ -447,3 +447,4 @@ jobs:
           print("Live Cloudflare auth passed for both admins; every known admin API, unknown admin paths, expired sessions, and tampered sessions were rejected appropriately. No real order was created.")
           PY
 # redeploy
+# trigger deployment verification
