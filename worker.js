@@ -126,6 +126,22 @@ async function notifyClientStatus(env, order) {
 
 const ADMIN_IDS = new Set(["6898182858", "5379947962"]);
 
+async function getQuantityPromotions(env, includeScheduled = false) {
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql = includeScheduled
+    ? "SELECT id,min_qty,discount_percent,starts_at,ends_at,active FROM promotions ORDER BY min_qty DESC,id DESC"
+    : "SELECT id,min_qty,discount_percent,starts_at,ends_at,active FROM promotions WHERE active=1 AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?) ORDER BY min_qty DESC,discount_percent DESC,id DESC";
+  const query = env.DB.prepare(sql);
+  const result = includeScheduled ? await query.all() : await query.bind(now, now).all();
+  return result.results || [];
+}
+
+function bestQuantityPromotion(promotions, quantity) {
+  return promotions
+    .filter(p => Number(p.min_qty) <= quantity && Number(p.discount_percent) > 0)
+    .sort((a,b) => Number(b.discount_percent) - Number(a.discount_percent) || Number(b.min_qty) - Number(a.min_qty))[0] || null;
+}
+
 function adminIds() {
   return ADMIN_IDS;
 }
@@ -180,16 +196,22 @@ async function handleApi(request, env, url) {
     ).bind(...ids).all();
 
     const byId = new Map(products.map(p => [Number(p.id), p]));
-    let total = 0;
+    let subtotal = 0;
     const clean = [];
     for (const item of items) {
       const p = byId.get(Number(item.id));
       const qty = Math.max(1, Math.min(99, Number(item.qty)||1));
       if (!p) return json({error:"Produit indisponible."},400);
-      total += Number(p.price) * qty;
+      subtotal += Number(p.price) * qty;
       clean.push({id:p.id,name:p.name,price:Number(p.price),qty});
     }
-    total = Math.round(total*100)/100;
+    subtotal = Math.round(subtotal*100)/100;
+    const totalQuantity = clean.reduce((sum, item) => sum + item.qty, 0);
+    const promotions = await getQuantityPromotions(env);
+    const promotion = bestQuantityPromotion(promotions, totalQuantity);
+    const discountPercent = promotion ? Number(promotion.discount_percent) : 0;
+    const discount = Math.round(subtotal * discountPercent) / 100;
+    const total = Math.round((subtotal - discount)*100)/100;
 
     const order = await env.DB.prepare(
       `INSERT INTO orders (telegram_user_id,telegram_name,total,payment,status,created_at)
@@ -208,7 +230,8 @@ async function handleApi(request, env, url) {
 
     const lines = clean.map(x => `• ${htmlEscape(x.name)} × ${x.qty}`).join("\n");
     const client = [user.first_name,user.last_name].filter(Boolean).join(" ") || user.username || `ID ${user.id}`;
-    const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${htmlEscape(client)}\n<b>ID Telegram :</b> <code>${htmlEscape(user.id)}</code>\n\n${lines}\n\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
+    const discountLine = discount > 0 ? `\n<b>Remise quantité :</b> -${discount.toFixed(2).replace(".",",")} € (${discountPercent}%)` : "";
+    const msg = `🛍️ <b>Nouvelle commande BCRVE85 #${orderId}</b>\n\n<b>Client :</b> ${htmlEscape(client)}\n<b>ID Telegram :</b> <code>${htmlEscape(user.id)}</code>\n\n${lines}\n\n<b>Sous-total :</b> ${subtotal.toFixed(2).replace(".",",")} €${discountLine}\n<b>Total :</b> ${total.toFixed(2).replace(".",",")} €\n<b>Paiement :</b> espèces\n<b>Statut :</b> nouvelle`;
     const replyMarkup = {
       inline_keyboard: [[
         { text: "💬 Répondre au client", url: `tg://user?id=${encodeURIComponent(String(user.id))}` }
@@ -221,16 +244,28 @@ async function handleApi(request, env, url) {
     const clientStatusDelivered = await telegramSend(
       env,
       String(user.id),
-      `🛍️ <b>Commande #${orderId} enregistrée</b>\n\nStatut : <b>🆕 Nouvelle</b>\nTotal : <b>${total.toFixed(2).replace(".",",")} €</b>\nPaiement : espèces\n\nTu recevras ici chaque changement de statut.`
+      `🛍️ <b>Commande #${orderId} enregistrée</b>\n\nStatut : <b>🆕 Nouvelle</b>\nSous-total : <b>${subtotal.toFixed(2).replace(".",",")} €</b>${discount > 0 ? `\nRemise quantité : <b>-${discount.toFixed(2).replace(".",",")} € (${discountPercent}%)</b>` : ""}\nTotal : <b>${total.toFixed(2).replace(".",",")} €</b>\nPaiement : espèces\n\nTu recevras ici chaque changement de statut.`
     );
 
     return json({
       ok:true,
       order_id:orderId,
       total,
+      subtotal,
+      discount,
+      discount_percent: discountPercent,
+      total_quantity: totalQuantity,
       notifications_delivered:notificationsDelivered,
       client_status_delivered:clientStatusDelivered
     });
+  }
+
+  if (url.pathname === "/api/promotions" && request.method === "GET") {
+    const promotions = await getQuantityPromotions(env);
+    return json(promotions.map(p => ({
+      min_qty: Number(p.min_qty),
+      discount_percent: Number(p.discount_percent)
+    })));
   }
 
   if (url.pathname === "/api/orders" && request.method === "GET") {
@@ -297,6 +332,50 @@ async function handleApi(request, env, url) {
     const updated = {...current,status:body.status};
     const notified = await notifyClientStatus(env, updated);
     return json({ok:true,changed:true,client_notified:notified});
+  }
+
+  if (url.pathname === "/api/admin/promotions" && request.method === "GET") {
+    return json(await getQuantityPromotions(env, true));
+  }
+
+  if (url.pathname === "/api/admin/promotions" && request.method === "POST") {
+    const b = await request.json();
+    const minQty = Number(b.min_qty);
+    const discountPercent = Number(b.discount_percent);
+    const startsAt = b.starts_at ? String(b.starts_at).trim().replace("T", " ") : null;
+    const endsAt = b.ends_at ? String(b.ends_at).trim().replace("T", " ") : null;
+    if (!Number.isInteger(minQty) || minQty < 2 || minQty > 999 || !Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+      return json({error:"Quantité minimale ou remise invalide."},400);
+    }
+    if (startsAt && endsAt && startsAt > endsAt) return json({error:"La fin doit être après le début."},400);
+    await env.DB.prepare(
+      "INSERT INTO promotions (min_qty,discount_percent,starts_at,ends_at,active) VALUES (?,?,?,?,1)"
+    ).bind(minQty,discountPercent,startsAt,endsAt).run();
+    return json({ok:true});
+  }
+
+  if (url.pathname === "/api/admin/promotions" && request.method === "PUT") {
+    const b = await request.json();
+    const id = Number(b.id);
+    const minQty = Number(b.min_qty);
+    const discountPercent = Number(b.discount_percent);
+    const startsAt = b.starts_at ? String(b.starts_at).trim().replace("T", " ") : null;
+    const endsAt = b.ends_at ? String(b.ends_at).trim().replace("T", " ") : null;
+    if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(minQty) || minQty < 2 || minQty > 999 || !Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+      return json({error:"Promotion invalide."},400);
+    }
+    if (startsAt && endsAt && startsAt > endsAt) return json({error:"La fin doit être après le début."},400);
+    await env.DB.prepare(
+      "UPDATE promotions SET min_qty=?,discount_percent=?,starts_at=?,ends_at=?,active=? WHERE id=?"
+    ).bind(minQty,discountPercent,startsAt,endsAt,b.active?1:0,id).run();
+    return json({ok:true});
+  }
+
+  if (url.pathname === "/api/admin/promotions" && request.method === "DELETE") {
+    const id = Number(new URL(request.url).searchParams.get("id"));
+    if (!Number.isInteger(id) || id <= 0) return json({error:"Promotion invalide."},400);
+    await env.DB.prepare("DELETE FROM promotions WHERE id=?").bind(id).run();
+    return json({ok:true});
   }
 
   if (url.pathname === "/api/admin/products" && request.method === "GET") {
