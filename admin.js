@@ -20,7 +20,7 @@ async function load(){
  document.getElementById("newCount").textContent=orders.filter(o=>o.status==="new").length;
  document.getElementById("cashTotal").textContent=euro(orders.filter(o=>o.status!=="delivered"&&o.status!=="cancelled").reduce((a,o)=>a+Number(o.total),0));
  document.getElementById("readyCount").textContent=orders.filter(o=>o.status==="ready").length;
- ordersEl.innerHTML=orders.length?orders.map(o=>'<article class="item"><div><b>#'+Number(o.id)+' · '+esc(o.telegram_name)+'</b><p>'+esc(o.items)+'</p><strong>'+euro(o.total)+'</strong> · espèces<br><small>'+esc(o.created_at)+'</small></div><select aria-label="Statut commande '+Number(o.id)+'" onchange="setStatus('+Number(o.id)+',this.value)">'+["new","preparing","ready","delivered","cancelled"].map(s=>'<option value="'+s+'" '+(s===o.status?"selected":"")+'>'+label(s)+'</option>').join("")+'</select></article>').join(""):'<div class="empty">Aucune commande.</div>';
+ ordersEl.innerHTML=orders.length?orders.map(o=>'<article class="item order-card"><div class="order-main"><div class="order-title"><b>#'+Number(o.id)+' · '+esc(o.telegram_name)+'</b><span class="status-pill status-'+esc(o.status)+'">'+label(o.status)+'</span></div><p>'+esc(o.items)+'</p><strong>'+euro(o.total)+'</strong> · espèces<br><small>'+esc(o.created_at)+'</small></div><div class="order-actions"><a class="reply-client" href="tg://user?id='+encodeURIComponent(String(o.telegram_user_id))+'">💬 Répondre</a><div class="quick-status">'+["new","preparing","ready","delivered","cancelled"].map(s=>'<button class="status-btn '+(s===o.status?"selected":"")+'" type="button" onclick="setStatus('+Number(o.id)+',\''+s+'\')" '+(s===o.status?"disabled":"")+'>'+label(s)+'</button>').join("")+'</div></div></article>').join(""):'<div class="empty">Aucune commande.</div>';
  try{
   catalogProducts=await api("/api/admin/products");
   productsEl.innerHTML=catalogProducts.map(p=>{
@@ -31,7 +31,17 @@ async function load(){
  }catch(e){productsEl.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
 }
 function label(s){return ({new:"Nouvelle",preparing:"Préparation",ready:"Prête",delivered:"Remise",cancelled:"Annulée"})[s]||s}
-async function setStatus(id,status){try{await api("/api/admin/orders/status",{method:"POST",body:JSON.stringify({id,status})});load()}catch(e){alert(e.message)}}
+async function setStatus(id,status){
+  const buttons=[...document.querySelectorAll(".status-btn")];
+  buttons.forEach(b=>b.disabled=true);
+  try{
+    await api("/api/admin/orders/status",{method:"POST",body:JSON.stringify({id,status})});
+    await load();
+  }catch(e){
+    alert(e.message);
+    buttons.forEach(b=>b.disabled=false);
+  }
+}
 function openProductEditor(id){
  const product=catalogProducts.find(item=>Number(item.id)===Number(id));
  if(!product)return;
