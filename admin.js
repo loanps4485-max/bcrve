@@ -64,9 +64,6 @@ function renderPromotionProducts(){
  el.innerHTML=catalogProducts.length?catalogProducts.map(p=>'<label class="promo-product-option"><input type="checkbox" value="'+Number(p.id)+'"> <span>'+esc(p.name)+'</span></label>').join(""):'<small>Aucun article disponible.</small>';
 }
 
- if(!value)return null;
- return new Date(value).toISOString().slice(0,19).replace("T"," ");
-}
 function formatPromoDate(value){
  if(!value)return "Sans limite";
  return new Date(value.replace(" ","T")+"Z").toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
