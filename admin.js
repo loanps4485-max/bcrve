@@ -179,4 +179,5 @@ function hasProductDraft(){return !document.getElementById("editProductPanel").c
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 load();setInterval(()=>{if(!hasProductDraft())load()},30000);
 
+function backToShop(){const initData=telegramInitData();if(initData){try{sessionStorage.setItem("bcrve_telegram_init_data",initData)}catch(e){}location.href="/?tgWebAppData="+encodeURIComponent(initData)}else{location.href="/"} }
 function refreshOrders(){load()}
