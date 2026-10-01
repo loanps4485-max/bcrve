@@ -359,15 +359,17 @@ async function handleApi(request, env, url) {
     const b = await request.json();
     const minQty = Number(b.min_qty);
     const discountPercent = Number(b.discount_percent);
+    const productIds = Array.isArray(b.product_ids) ? [...new Set(b.product_ids.map(Number).filter(Number.isInteger))] : [];
     const startsAt = b.starts_at ? String(b.starts_at).trim().replace("T", " ") : null;
     const endsAt = b.ends_at ? String(b.ends_at).trim().replace("T", " ") : null;
     if (!Number.isInteger(minQty) || minQty < 2 || minQty > 999 || !Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
       return json({error:"Quantité minimale ou remise invalide."},400);
     }
     if (startsAt && endsAt && startsAt > endsAt) return json({error:"La fin doit être après le début."},400);
-    await env.DB.prepare(
-      "INSERT INTO promotions (min_qty,discount_percent,starts_at,ends_at,active) VALUES (?,?,?,?,1)"
-    ).bind(minQty,discountPercent,startsAt,endsAt).run();
+    if (!productIds.length) return json({error:"Sélectionne au moins un article."},400);
+    const created = await env.DB.prepare("INSERT INTO promotions (min_qty,discount_percent,starts_at,ends_at,active) VALUES (?,?,?,?,1)").bind(minQty,discountPercent,startsAt,endsAt).run();
+    const promotionId = created.meta?.last_row_id;
+    for (const productId of productIds) await env.DB.prepare("INSERT INTO promotion_products (promotion_id,product_id) VALUES (?,?)").bind(promotionId,productId).run();
     return json({ok:true});
   }
 
@@ -376,21 +378,24 @@ async function handleApi(request, env, url) {
     const id = Number(b.id);
     const minQty = Number(b.min_qty);
     const discountPercent = Number(b.discount_percent);
+    const productIds = Array.isArray(b.product_ids) ? [...new Set(b.product_ids.map(Number).filter(Number.isInteger))] : [];
     const startsAt = b.starts_at ? String(b.starts_at).trim().replace("T", " ") : null;
     const endsAt = b.ends_at ? String(b.ends_at).trim().replace("T", " ") : null;
     if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(minQty) || minQty < 2 || minQty > 999 || !Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
       return json({error:"Promotion invalide."},400);
     }
     if (startsAt && endsAt && startsAt > endsAt) return json({error:"La fin doit être après le début."},400);
-    await env.DB.prepare(
-      "UPDATE promotions SET min_qty=?,discount_percent=?,starts_at=?,ends_at=?,active=? WHERE id=?"
-    ).bind(minQty,discountPercent,startsAt,endsAt,b.active?1:0,id).run();
+    if (!productIds.length) return json({error:"Sélectionne au moins un article."},400);
+    await env.DB.prepare("UPDATE promotions SET min_qty=?,discount_percent=?,starts_at=?,ends_at=?,active=? WHERE id=?").bind(minQty,discountPercent,startsAt,endsAt,b.active?1:0,id).run();
+    await env.DB.prepare("DELETE FROM promotion_products WHERE promotion_id=?").bind(id).run();
+    for (const productId of productIds) await env.DB.prepare("INSERT INTO promotion_products (promotion_id,product_id) VALUES (?,?)").bind(id,productId).run();
     return json({ok:true});
   }
 
   if (url.pathname === "/api/admin/promotions" && request.method === "DELETE") {
     const id = Number(new URL(request.url).searchParams.get("id"));
     if (!Number.isInteger(id) || id <= 0) return json({error:"Promotion invalide."},400);
+    await env.DB.prepare("DELETE FROM promotion_products WHERE promotion_id=?").bind(id).run();
     await env.DB.prepare("DELETE FROM promotions WHERE id=?").bind(id).run();
     return json({ok:true});
   }
