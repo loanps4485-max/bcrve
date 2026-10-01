@@ -296,7 +296,8 @@ async function handleApi(request, env, url) {
     const promotions = await getQuantityPromotions(env);
     return json(promotions.map(p => ({
       min_qty: Number(p.min_qty),
-      discount_percent: Number(p.discount_percent)
+      discount_percent: Number(p.discount_percent),
+      product_ids: Array.isArray(p.product_ids) ? p.product_ids.map(Number) : []
     })));
   }
 
