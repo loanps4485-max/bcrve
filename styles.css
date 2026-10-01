@@ -6,3 +6,5 @@
 .admin-access-hint{border:1px solid var(--line);background:rgba(255,254,250,.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--muted);border-radius:14px;padding:11px 14px;font-size:11px;font-weight:700;line-height:1.4;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.06)}
 
 .secondary-action{background:#eef0f5;color:#101b35;margin-top:8px}
+
+.order-progress{display:flex;gap:6px;margin-top:10px}.order-progress span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#edf0f5;color:#8b93a4;font-size:12px;opacity:.7}.order-progress span.done{background:#101b35;color:#fff;opacity:1}.order-history{padding:15px 0}.status-text{font-weight:700;margin-top:4px}
