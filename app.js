@@ -31,7 +31,14 @@ async function loadProducts(){try{const [productsResponse,promotionsResponse]=aw
 function render(cat=currentCategory){currentCategory=cat;document.getElementById("chips").innerHTML=[["all","Tout"],["selection","Sélection"],["edition","Édition"],["packs","Packs"]].map(x=>`<button type="button" class="chip ${x[0]===cat?"on":""}" aria-pressed="${x[0]===cat}" onclick="render('${x[0]}')">${x[1]}</button>`).join("");const list=cat==="all"?products:products.filter(p=>p.cat===cat);document.getElementById("products").innerHTML=list.length?list.map(p=>{const id=Number(p.id);const isFavorite=favoriteIds.includes(id);return `<article class="card"><div class="visual"><span>JUL · 13</span></div><div class="info"><div class="name">${escapeHtml(p.name)}</div><div class="sub">${escapeHtml(p.sub||"")}</div><div class="row"><span class="price">${euro(p.price)}</span><div class="actions"><button type="button" class="favorite-toggle ${isFavorite?"on":""}" aria-label="${isFavorite?"Retirer des favoris":"Ajouter aux favoris"}" aria-pressed="${isFavorite}" onclick="toggleFavorite(${id})">${isFavorite?"♥":"♡"}</button><button type="button" class="add" aria-label="Ajouter ${escapeHtml(p.name)} au panier" onclick="add(${id})">+</button></div></div></div></article>`}).join(""):'<div class="empty">Aucun article dans cette sélection.</div>'}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}function add(id){let x=cartData.find(x=>x.id===id);if(x){if(x.qty>=99){toast("Maximum 99 par produit");return}x.qty++}else cartData.push({id,qty:1});save();toast("Ajouté · c’est carré 😎") }
 function changeQty(id,delta){let x=cartData.find(x=>x.id===id);if(!x)return;const next=Math.max(0,Math.min(99,x.qty+delta));if(next===0)cartData=cartData.filter(x=>x.id!==id);else x.qty=next;save();cart()}
-function getCartPromotion(totalQuantity){return promotions.filter(p=>Number(p.min_qty)<=totalQuantity).sort((a,b)=>Number(b.discount_percent)-Number(a.discount_percent)||Number(b.min_qty)-Number(a.min_qty))[0]||null}
+function getCartPromotion(){
+ const candidates=promotions.map(p=>{
+  const ids=Array.isArray(p.product_ids)?p.product_ids:[];
+  const eligible=ids.length?cartData.filter(x=>ids.includes(Number(x.id))):cartData;
+  return {p,qty:eligible.reduce((sum,x)=>sum+x.qty,0),subtotal:eligible.reduce((sum,x)=>{const product=products.find(y=>y.id===x.id);return sum+(product?product.price*x.qty:0)},0)};
+ }).filter(x=>x.qty>=Number(x.p.min_qty)&&x.subtotal>0);
+ return candidates.sort((a,b)=>Number(b.p.discount_percent)-Number(a.p.discount_percent)||Number(b.p.min_qty)-Number(a.p.min_qty))[0]||null;
+}
 function cart(btn){
  if(btn)nav(btn);
  let lines=cartData.map(x=>{let p=products.find(p=>p.id===x.id);if(!p)return "";
@@ -39,10 +46,11 @@ function cart(btn){
  let subtotal=cartData.reduce((sum,x)=>{let p=products.find(p=>p.id===x.id);return sum+(p?p.price*x.qty:0)},0);
  subtotal=Math.round(subtotal*100)/100;
  const totalQuantity=cartData.reduce((sum,x)=>sum+x.qty,0);
- const promo=getCartPromotion(totalQuantity);
- const discount=promo?Math.round(subtotal*Number(promo.discount_percent))/100:0;
+ const promoMatch=getCartPromotion();
+ const promo=promoMatch?.p||null;
+ const discount=promoMatch?Math.round(promoMatch.subtotal*Number(promo.discount_percent))/100:0;
  const total=Math.round((subtotal-discount)*100)/100;
- const promoNotice=promo?'<div class="notice discount-notice">🎉 Remise quantité : <b>-'+Number(promo.discount_percent).toLocaleString("fr-FR")+'%</b> ('+totalQuantity+' produits)<br><span>Sous-total : '+euro(subtotal)+' · Économie : '+euro(discount)+'</span></div>':promotions.length?'<div class="notice">Ajoute plus de produits pour débloquer une remise quantité.</div>':"";
+ const promoNotice=promo?'<div class="notice discount-notice">🎉 Remise quantité : <b>-'+Number(promo.discount_percent).toLocaleString("fr-FR")+'%</b> ('+promoMatch.qty+' articles concernés)<br><span>Sous-total : '+euro(subtotal)+' · Économie : '+euro(discount)+'</span></div>':promotions.length?'<div class="notice">Ajoute plus de produits pour débloquer une remise quantité.</div>':"";
  show('<button class="close" onclick="closeModal()">×</button><h3>Votre panier</h3>'+(lines||'<div class="empty">Votre panier est vide.</div>')+(cartData.length?'<div class="line"><b>Sous-total</b><b>'+euro(subtotal)+'</b></div>'+promoNotice+'<div class="line"><b>Total</b><b>'+euro(total)+'</b></div><div class="notice">Paiement : <b>espèces</b> lors de la remise.</div><button class="full" onclick="order()">Confirmer la commande</button>':""));
 }
 function removeItem(id){let x=cartData.find(x=>x.id===id);if(!x)return;x.qty--;if(x.qty<=0)cartData=cartData.filter(x=>x.id!==id);save();cart()}
