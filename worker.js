@@ -260,6 +260,26 @@ async function handleApi(request, env, url) {
     return json(results);
   }
 
+  if (url.pathname === "/api/admin/orders/reply" && request.method === "POST") {
+    let body;
+    try { body = await request.json(); } catch { return json({error:"JSON invalide."},400); }
+    const id = Number(body.id);
+    const message = String(body.message || "").trim();
+    if (!Number.isInteger(id) || id <= 0) return json({error:"Commande invalide."},400);
+    if (!message || message.length > 1500) return json({error:"Message requis (1500 caractères max)."},400);
+    const order = await env.DB.prepare(
+      "SELECT id,telegram_user_id FROM orders WHERE id=?"
+    ).bind(id).first();
+    if (!order) return json({error:"Commande introuvable."},404);
+    const delivered = await telegramSend(
+      env,
+      order.telegram_user_id,
+      `💬 <b>Message BCRVE85 · commande #${order.id}</b>\n\n${htmlEscape(message)}`
+    );
+    if (!delivered) return json({error:"Telegram n'a pas pu remettre le message au client."},502);
+    return json({ok:true,delivered:true});
+  }
+
   if (url.pathname === "/api/admin/orders/status" && request.method === "POST") {
     let body;
     try { body = await request.json(); } catch { return json({error:"JSON invalide."},400); }
