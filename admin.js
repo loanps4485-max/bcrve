@@ -39,9 +39,13 @@ async function load(){
   if(el)el.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
  }
 }
+function toDbDate(value){
+ if(!value)return null;
+ return new Date(value).toISOString().slice(0,19).replace("T"," ");
+}
 function formatPromoDate(value){
  if(!value)return "Sans limite";
- return new Date(value.replace(" ","T")).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+ return new Date(value.replace(" ","T")+"Z").toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
 }
 function renderPromotions(list){
  const el=document.getElementById("promotions");
@@ -67,8 +71,8 @@ document.getElementById("promotionForm").addEventListener("submit",async event=>
   await api("/api/admin/promotions",{method:"POST",body:JSON.stringify({
    min_qty:Number(document.getElementById("promoQty").value),
    discount_percent:Number(document.getElementById("promoPercent").value),
-   starts_at:document.getElementById("promoStart").value,
-   ends_at:document.getElementById("promoEnd").value
+   starts_at:toDbDate(document.getElementById("promoStart").value),
+   ends_at:toDbDate(document.getElementById("promoEnd").value)
   })});
   form.reset();
   await load();
