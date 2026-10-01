@@ -35,3 +35,12 @@ INSERT OR IGNORE INTO products(id,name,sub,price,cat,active,sort_order) VALUES
 (4,'Collection No. 04','Sélection du moment',10.90,'selection',1,4),
 (5,'Édition Noire','Série limitée',14.90,'edition',1,5),
 (6,'Pack Découverte','3 références',21.90,'packs',1,6);
+
+CREATE TABLE IF NOT EXISTS promotions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  min_qty INTEGER NOT NULL,
+  discount_percent REAL NOT NULL,
+  starts_at TEXT,
+  ends_at TEXT,
+  active INTEGER NOT NULL DEFAULT 1
+);
