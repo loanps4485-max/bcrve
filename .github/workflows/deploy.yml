@@ -190,6 +190,10 @@ jobs:
             { path: "/api/admin/orders", method: "GET" },
             { path: "/api/admin/orders/status", method: "POST", body: { id: 1, status: "ready" } },
             { path: "/api/admin/products", method: "GET" },
+            { path: "/api/admin/promotions", method: "GET" },
+            { path: "/api/admin/promotions", method: "POST", body: { min_qty: 5, discount_percent: 10 } },
+            { path: "/api/admin/promotions", method: "PUT", body: { id: 1, min_qty: 5, discount_percent: 10 } },
+            { path: "/api/admin/promotions?id=1", method: "DELETE" },
             { path: "/api/admin/products", method: "POST", body: { name: "Blocked", price: 1 } },
             { path: "/api/admin/products", method: "PUT", body: { id: 1, name: "Blocked", price: 1 } },
             { path: "/api/admin", method: "GET" },
@@ -218,6 +222,9 @@ jobs:
                       async all() {
                         if (sql.startsWith("SELECT id,name,price FROM products")) {
                           return { results: [{ id: 7, name: "Synthetic product", price: 12.5 }] };
+                        }
+                        if (sql.startsWith("SELECT id,min_qty,discount_percent,starts_at,ends_at,active FROM promotions")) {
+                          return { results: [] };
                         }
                         throw new Error("Unexpected synthetic query.");
                       },
@@ -385,6 +392,9 @@ jobs:
               ("/api/admin/orders", "GET", None),
               ("/api/admin/orders/status", "POST", b"{}"),
               ("/api/admin/products", "GET", None),
+              ("/api/admin/promotions", "GET", None),
+              ("/api/admin/promotions", "POST", b"{}"),
+              ("/api/admin/promotions", "PUT", b"{}"),
               ("/api/admin/products", "POST", b"{}"),
               ("/api/admin/products", "PUT", b"{}"),
           )
