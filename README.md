@@ -18,6 +18,17 @@ La page `admin.html` gère les commandes et le catalogue. Le raccourci Admin s�
 
 Toutes les routes `/api/admin/*` vérifient la session Telegram **côté serveur**. Seuls les IDs Telegram `6898182858` et `5379947962` sont autorisés. Cette liste est fixée dans `worker.js`; il n’y a pas de variable `ADMIN_IDS` à configurer.
 
+## Vérifications locales
+
+Le projet utilise les outils intégrés à Node.js 22, sans dépendance à installer :
+
+```sh
+npm run check
+npm test
+```
+
+Les contrôles couvrent la syntaxe, les seuils et ciblages de promotion, le panier, le stock, les favoris, les éléments des pages et l’authentification Telegram. Le workflow de déploiement exécute ces mêmes vérifications avant d’appliquer les migrations ou de publier le Worker.
+
 ## Déploiement et secrets
 
 Un push sur `main` lance le workflow [Deploy to Cloudflare](.github/workflows/deploy.yml). Il publie le Worker et les fichiers de la boutique.

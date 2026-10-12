@@ -15,10 +15,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Prepare public assets
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate code and prepare public assets
         run: |
-          node --check app.js
-          node --check admin.js
+          npm run check
+          npm test
           mkdir -p public
           cp index.html admin.html app.js admin.js promotions.js styles.css admin.css public/
 
@@ -461,5 +465,30 @@ jobs:
 
           print("Live Cloudflare auth passed for both admins; every known admin API, unknown admin paths, expired sessions, and tampered sessions were rejected appropriately. No real order was created.")
           PY
-# redeploy
-# trigger deployment verification
+
+      - name: Point Telegram menu to the current Mini App
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ["BOT_TOKEN"].strip()
+          url = "https://api.telegram.org/bot" + token + "/setChatMenuButton"
+          payload = urllib.parse.urlencode({
+              "menu_button": json.dumps({
+                  "type": "web_app",
+                  "text": "🛍️ Ouvrir la boutique",
+                  "web_app": {"url": "https://bcrve.loanps4485.workers.dev"}
+              }, ensure_ascii=False)
+          }).encode()
+          request = urllib.request.Request(url, data=payload, method="POST")
+          with urllib.request.urlopen(request, timeout=20) as response:
+              result = json.load(response)
+          if not result.get("ok"):
+              raise SystemExit("Telegram setChatMenuButton failed.")
+          print("Telegram menu points to the current BCRVE Mini App.")
+          PY

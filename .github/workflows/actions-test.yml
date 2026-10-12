@@ -14,9 +14,6 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
-        run: |
-          node --check app.js
-          node --check admin.js
-          node --check promotions.js
-      - name: Test promotion calculations
-        run: node --test tests/*.test.js
+        run: npm run check
+      - name: Run automated tests
+        run: npm test
