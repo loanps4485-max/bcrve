@@ -226,7 +226,7 @@ jobs:
                   bind(...bindings) {
                     return {
                       async all() {
-                        if (sql.startsWith("SELECT id,name,price FROM products")) {
+                        if (sql.startsWith("SELECT id,name,price,stock FROM products")) {
                           return { results: [{ id: 7, name: "Synthetic product", price: 12.5 }] };
                         }
                         if (sql.startsWith("SELECT id,min_qty,discount_percent,starts_at,ends_at,active FROM promotions")) {
