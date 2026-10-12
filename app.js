@@ -36,12 +36,12 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":
   if(product&&Number(product.stock)===0){toast("Produit en rupture de stock");return}let x=cartData.find(x=>x.id===id);if(x){if(x.qty>=99){toast("Maximum 99 par produit");return}x.qty++}else cartData.push({id,qty:1});save();toast("Ajouté · c’est carré 😎") }
 function changeQty(id,delta){let x=cartData.find(x=>x.id===id);if(!x)return;const next=Math.max(0,Math.min(99,x.qty+delta));if(next===0)cartData=cartData.filter(x=>x.id!==id);else x.qty=next;save();cart()}
 function getCartPromotion(){
- const candidates=promotions.map(p=>{
-  const ids=Array.isArray(p.product_ids)?p.product_ids:[];
-  const eligible=ids.length?cartData.filter(x=>ids.includes(Number(x.id))):cartData;
-  return {p,qty:eligible.reduce((sum,x)=>sum+x.qty,0),subtotal:eligible.reduce((sum,x)=>{const product=products.find(y=>y.id===x.id);return sum+(product?product.price*x.qty:0)},0)};
- }).filter(x=>x.qty>=Number(x.p.min_qty)&&x.subtotal>0);
- return candidates.sort((a,b)=>Number(b.p.min_qty)-Number(a.p.min_qty)||Number(b.p.discount_percent)-Number(a.p.discount_percent))[0]||null;
+ const items=cartData.map(item=>{
+  const product=products.find(candidate=>Number(candidate.id)===Number(item.id));
+  return {id:item.id,qty:item.qty,price:product?product.price:0};
+ });
+ const breakdown=BCRVEPromotions.getPromotionBreakdown(items,promotions);
+ return breakdown.promotion?{...breakdown,p:breakdown.promotion,qty:breakdown.quantity}:null;
 }
 function cart(btn){
  if(btn)nav(btn);
@@ -49,21 +49,9 @@ function cart(btn){
  subtotal=Math.round(subtotal*100)/100;
  const promoMatch=getCartPromotion();
  const promo=promoMatch?.p||null;
- const discountQty=promoMatch?Math.min(Number(promo.min_qty),Number(promoMatch.qty)):0;
- const discountedQtyById=new Map();
- let remainingDiscountQty=discountQty;
- if(promoMatch){
-   const ids=Array.isArray(promo.product_ids)?promo.product_ids:[];
-   for(const item of cartData){
-     if(ids.length&&!ids.includes(Number(item.id)))continue;
-     const qtyForDiscount=Math.min(item.qty,Math.max(0,remainingDiscountQty));
-     if(qtyForDiscount>0)discountedQtyById.set(Number(item.id),qtyForDiscount);
-     remainingDiscountQty-=qtyForDiscount;
-     if(remainingDiscountQty<=0)break;
-   }
- }
- const discountBase=cartData.reduce((sum,x)=>{const p=products.find(p=>p.id===x.id);const q=discountedQtyById.get(Number(x.id))||0;return sum+(p?p.price*q:0)},0);
- const discount=promoMatch?Math.round(discountBase*Number(promo.discount_percent))/100:0;
+ const discountQty=promoMatch?promoMatch.discountQty:0;
+ const discountedQtyById=promoMatch?.discountedQtyById||new Map();
+ const discount=promoMatch?.discount||0;
  const total=Math.round((subtotal-discount)*100)/100;
  let lines=cartData.map(x=>{let p=products.find(p=>p.id===x.id);if(!p)return "";
    const discountedQty=discountedQtyById.get(Number(x.id))||0;

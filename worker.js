@@ -1,3 +1,5 @@
+import "./promotions.js";
+
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
@@ -219,26 +221,11 @@ async function handleApi(request, env, url) {
     subtotal = Math.round(subtotal*100)/100;
     const totalQuantity = clean.reduce((sum, item) => sum + item.qty, 0);
     const promotions = await getQuantityPromotions(env);
-    const candidates = promotions.map(p => {
-      const ids = Array.isArray(p.product_ids) ? p.product_ids : [];
-      const eligible = ids.length ? clean.filter(item => ids.includes(Number(item.id))) : clean;
-      return { promotion:p, quantity:eligible.reduce((sum,item)=>sum+item.qty,0), subtotal:eligible.reduce((sum,item)=>sum+item.price*item.qty,0) };
-    });
-    const eligiblePromotion = candidates.filter(x => Number(x.promotion.min_qty)<=x.quantity && Number(x.promotion.discount_percent)>0 && x.subtotal>0).sort((a,b)=>Number(b.promotion.min_qty)-Number(a.promotion.min_qty)||Number(b.promotion.discount_percent)-Number(a.promotion.discount_percent))[0] || null;
-    const promotion = eligiblePromotion?.promotion || null;
+    const promotionBreakdown = BCRVEPromotions.getPromotionBreakdown(clean, promotions);
+    const promotion = promotionBreakdown.promotion;
     const discountPercent = promotion ? Number(promotion.discount_percent) : 0;
-    const discountQty = eligiblePromotion ? Math.min(Number(promotion.min_qty), Number(eligiblePromotion.quantity)) : 0;
-    let remainingDiscountQty = discountQty;
-    let discountBase = 0;
-    for (const item of clean) {
-      const ids = Array.isArray(promotion?.product_ids) ? promotion.product_ids : [];
-      if (ids.length && !ids.includes(Number(item.id))) continue;
-      const qtyForDiscount = Math.min(item.qty, Math.max(0, remainingDiscountQty));
-      discountBase += item.price * qtyForDiscount;
-      remainingDiscountQty -= qtyForDiscount;
-      if (remainingDiscountQty <= 0) break;
-    }
-    const discount = Math.round(discountBase * discountPercent) / 100;
+    const discountQty = promotionBreakdown.discountQty;
+    const discount = promotionBreakdown.discount;
     const total = Math.round((subtotal - discount)*100)/100;
 
     const stockUpdates = clean.map(x => env.DB.prepare("UPDATE products SET stock=stock-? WHERE id=? AND stock>=?").bind(x.qty,x.id,x.qty));
@@ -465,3 +452,4 @@ export default {
     return env.ASSETS.fetch(request);
   }
 };
+

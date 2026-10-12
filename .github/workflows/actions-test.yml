@@ -9,4 +9,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "GitHub Actions fonctionne"
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check admin.js
+          node --check promotions.js
+      - name: Test promotion calculations
+        run: node --test tests/*.test.js

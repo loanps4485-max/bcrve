@@ -20,7 +20,7 @@ jobs:
           node --check app.js
           node --check admin.js
           mkdir -p public
-          cp index.html admin.html app.js admin.js styles.css admin.css public/
+          cp index.html admin.html app.js admin.js promotions.js styles.css admin.css public/
 
       - name: Validate token and inspect Mini App entry points
         env:
@@ -148,7 +148,13 @@ jobs:
           const token = process.env.BOT_TOKEN?.trim();
           assert(token, "BOT_TOKEN is unavailable to the verification step.");
 
-          const source = await readFile("./worker.js", "utf8");
+          const promotionSource = await readFile("./promotions.js", "utf8");
+          const promotionModuleUrl = "data:text/javascript;base64," + Buffer.from(promotionSource).toString("base64");
+          await import(promotionModuleUrl);
+          const source = (await readFile("./worker.js", "utf8")).replace(
+            /^import [\"']\.\/promotions\.js[\"'];\s*/m,
+            "",
+          );
           const moduleUrl = "data:text/javascript;base64," + Buffer.from(source).toString("base64");
           const { default: worker } = await import(moduleUrl);
 
