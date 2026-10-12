@@ -219,15 +219,17 @@ jobs:
           console.log("Telegram auth passed for both admins; other and unauthenticated accounts were denied; no order was created.");
 
           function fakeDatabase() {
-            const counts = { orders: 0, items: 0 };
+            const counts = { orders: 0, items: 0, stockUpdates: 0 };
             const DB = {
               prepare(sql) {
                 return {
                   bind(...bindings) {
                     return {
+                      sql,
+                      bindings,
                       async all() {
                         if (sql.startsWith("SELECT id,name,price,stock FROM products")) {
-                          return { results: [{ id: 7, name: "Synthetic product", price: 12.5 }] };
+                          return { results: [{ id: 7, name: "Synthetic product", price: 12.5, stock: 50 }] };
                         }
                         if (sql.startsWith("SELECT id,min_qty,discount_percent,starts_at,ends_at,active FROM promotions")) {
                           return { results: [] };
@@ -246,8 +248,12 @@ jobs:
                 };
               },
               async batch(statements) {
-                counts.items += statements.length;
-                return statements.map(() => ({ success: true }));
+                if (statements.some(statement => statement.sql.startsWith("UPDATE products SET stock"))) {
+                  counts.stockUpdates += statements.length;
+                } else {
+                  counts.items += statements.length;
+                }
+                return statements.map(() => ({ success: true, meta: { changes: 1 } }));
               },
             };
             return { DB, counts };
@@ -279,6 +285,7 @@ jobs:
             assert.equal(successData.notifications_delivered, 2);
             assert.equal(successFixture.counts.orders, 1);
             assert.equal(successFixture.counts.items, 1);
+            assert.equal(successFixture.counts.stockUpdates, 1);
             assert.equal(successfulNotifications, 3);
 
             let partialNotificationCalls = 0;
@@ -300,6 +307,7 @@ jobs:
             assert.equal(partialData.client_status_delivered, true);
             assert.equal(partialFixture.counts.orders, 1);
             assert.equal(partialFixture.counts.items, 1);
+            assert.equal(partialFixture.counts.stockUpdates, 1);
             assert.equal(partialNotificationCalls, 3);
 
             globalThis.fetch = async () => {
@@ -313,6 +321,7 @@ jobs:
             assert.equal(failureData.client_status_delivered, false);
             assert.equal(failureFixture.counts.orders, 1);
             assert.equal(failureFixture.counts.items, 1);
+            assert.equal(failureFixture.counts.stockUpdates, 1);
             assert.equal(successfulNotifications, 3);
           } finally {
             globalThis.fetch = originalFetch;
